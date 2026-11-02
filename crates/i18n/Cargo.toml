@@ -1,0 +1,11 @@
+[package]
+name = "overture-i18n"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Real-time PT-BR and EN internationalization for Overture"
+
+[dependencies]
+serde.workspace = true

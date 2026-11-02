@@ -1,0 +1,21 @@
+[package]
+name = "overture-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Slide composition engine using cosmic-text and wgpu"
+
+[dependencies]
+overture-core.workspace = true
+cosmic-text.workspace = true
+wgpu.workspace = true
+pollster.workspace = true
+bytemuck.workspace = true
+image.workspace = true
+raw-window-handle.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+chrono.workspace = true

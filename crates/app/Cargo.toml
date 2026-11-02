@@ -1,0 +1,35 @@
+[package]
+name = "overture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Overture — Native worship projection desktop application"
+
+[[bin]]
+name = "overture"
+path = "src/main.rs"
+
+[dependencies]
+overture-core.workspace = true
+overture-storage.workspace = true
+overture-import.workspace = true
+overture-render.workspace = true
+overture-media.workspace = true
+overture-output.workspace = true
+overture-control.workspace = true
+overture-i18n.workspace = true
+overture-ui.workspace = true
+slint.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+directories.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+windows-sys.workspace = true
+
+[build-dependencies]
+winresource.workspace = true

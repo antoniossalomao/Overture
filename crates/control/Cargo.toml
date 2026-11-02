@@ -1,0 +1,27 @@
+[package]
+name = "overture-control"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Local HTTP/WebSocket remote control API and responsive mobile web interface"
+
+[dependencies]
+overture-core.workspace = true
+overture-storage.workspace = true
+overture-i18n.workspace = true
+axum.workspace = true
+tower-http.workspace = true
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true
+tokio-tungstenite.workspace = true
+tempfile.workspace = true

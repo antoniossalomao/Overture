@@ -1,0 +1,24 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# Databases & temporary data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.overture-backup.zip
+
+# Local redistributables (large binaries fetched during packaging if not tracked)
+/redist/*.7z
+/redist/*.exe
+
+# IDE & OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+*.pdb
+*.wixobj
+*.wixpdb

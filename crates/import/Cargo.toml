@@ -1,0 +1,27 @@
+[package]
+name = "overture-import"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Lyrics/presentation parsers (TXT, OpenSong, OpenLP XML, PowerPoint) and exporters"
+
+[dependencies]
+overture-core.workspace = true
+encoding_rs.workspace = true
+quick-xml.workspace = true
+zip.workspace = true
+sha2.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+overture-storage.workspace = true
+tokio.workspace = true

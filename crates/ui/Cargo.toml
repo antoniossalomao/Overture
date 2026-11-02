@@ -1,0 +1,16 @@
+[package]
+name = "overture-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Slint desktop user interface for Overture"
+
+[dependencies]
+overture-core.workspace = true
+overture-i18n.workspace = true
+slint.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true
