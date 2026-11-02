@@ -91,11 +91,16 @@ fn main() -> anyhow::Result<()> {
     )?;
 
     let wait_ms = auto_close_ms.unwrap_or(3000);
-    std::thread::sleep(Duration::from_millis(wait_ms / 2));
+    let wait_ready = Instant::now();
+    while manager.telemetry().frames_presented() == 0
+        && wait_ready.elapsed() < Duration::from_secs(5)
+    {
+        std::thread::sleep(Duration::from_millis(15));
+    }
 
-    // Trigger slide transition and measure command -> GPU present latency
+    // Trigger slide transition and measure steady-state command -> GPU present latency
     engine.dispatch(CoreCommand::NextSlide);
-    std::thread::sleep(Duration::from_millis(wait_ms / 2));
+    std::thread::sleep(Duration::from_millis((wait_ms / 2).max(250)));
 
     println!(
         "Spike concluído em {:?} | Frames apresentados: {} | Última latência comando->GPU: {:.2} ms (máx {:.2} ms)",

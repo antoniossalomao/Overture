@@ -17,7 +17,8 @@ pub struct GpuContext {
 impl GpuContext {
     pub fn new(compatible_surface: Option<&wgpu::Surface<'_>>) -> Result<Self> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN | wgpu::Backends::GL,
+            backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN,
+            flags: wgpu::InstanceFlags::empty(),
             ..Default::default()
         });
         Self::from_instance(instance, compatible_surface)

@@ -166,7 +166,8 @@ impl OutputAppHandler {
         // Initialize GpuContext against the first real window surface if not yet initialized
         if self.gpu.is_none() {
             let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-                backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN | wgpu::Backends::GL,
+                backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN,
+                flags: wgpu::InstanceFlags::empty(),
                 ..Default::default()
             });
             let temp_surface = match instance.create_surface(window.clone()) {
