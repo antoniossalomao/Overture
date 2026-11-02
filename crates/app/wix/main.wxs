@@ -101,6 +101,14 @@
                                 Source='$(sys.SOURCEFILEDIR)..\..\..\assets\overture.ico'
                                 KeyPath='yes'/>
                         </Component>
+                        <Component Id='AppLogoPngAsset' Guid='9C4A61E8-3B72-4F85-8E13-75D9A4C2B071'>
+                            <File
+                                Id='overture_512_png'
+                                Name='overture-512.png'
+                                DiskId='1'
+                                Source='$(sys.SOURCEFILEDIR)..\..\..\assets\overture-512.png'
+                                KeyPath='yes'/>
+                        </Component>
                     </Directory>
 
                 </Directory>
@@ -149,6 +157,7 @@
             <ComponentRef Id='LibmpvRuntime'/>
             <ComponentRef Id='MpvDefaultConfig'/>
             <ComponentRef Id='AppIconAsset'/>
+            <ComponentRef Id='AppLogoPngAsset'/>
             <ComponentRef Id='StartMenuShortcut'/>
         </Feature>
 

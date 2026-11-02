@@ -40,7 +40,7 @@ Write-Host "  ARPPRODUCTICON = $($props['ARPPRODUCTICON'])"
 
 if ($props['ProductName'] -ne 'Overture') { throw "Expected ProductName=Overture" }
 if ($props['Manufacturer'] -ne 'Overture Project') { throw "Expected Manufacturer=Overture Project" }
-if ($props['ProductVersion'] -ne '0.1.0') { throw "Expected ProductVersion=0.1.0" }
+if ($props['ProductVersion'] -ne '0.1.1') { throw "Expected ProductVersion=0.1.1, got $($props['ProductVersion'])" }
 if ($props['UpgradeCode'] -ne '{9F4E8A71-3D2C-4B85-A619-7C80E5D12F01}') { throw "Unexpected UpgradeCode: $($props['UpgradeCode'])" }
 if ($props['ARPPRODUCTICON'] -ne 'ProductICO') { throw "Missing ARPPRODUCTICON" }
 
@@ -62,7 +62,7 @@ $files = @(Query-MsiTable 'SELECT `File`, `FileName` FROM `File`')
 $fileNames = $files | ForEach-Object { ($_.Cols[1] -split '\|')[-1] }
 Write-Host "  Packaged files = $($fileNames -join ', ')"
 
-foreach ($expected in @('overture.exe', 'libmpv-2.dll', 'd3dcompiler_47.dll', 'mpv.conf', 'overture.ico')) {
+foreach ($expected in @('overture.exe', 'libmpv-2.dll', 'd3dcompiler_47.dll', 'mpv.conf', 'overture.ico', 'overture-512.png')) {
     if ($fileNames -notcontains $expected) {
         throw "Expected packaged file missing from MSI: $expected"
     }
