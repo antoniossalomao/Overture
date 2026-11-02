@@ -1,10 +1,15 @@
 # Overture
 
-Aplicativo desktop nativo em **Rust** para **Windows** voltado à montagem e projeção de letras, Bíblia, mídias, contagem regressiva, placar e avisos em cultos e eventos. Possui saída principal fullscreen acelerada por GPU (`wgpu` + `cosmic-text`), tela de palco independente, monitor de retorno com tema próprio, controle remoto via celular na rede local (`axum` HTTP + WebSocket), internacionalização completa em tempo real (**PT-BR** / **EN**) e instalador nativo `.msi` (`cargo-wix`).
+Aplicativo desktop nativo **100% Rust puro** (zero JavaScript / WebView2) para **Windows**, inspirado no fluxo operacional de estúdio do **Holyrics** e modernizado com um design system próprio baseado em **`shadcn/ui` Zinc Dark** renderizado em GPU via **Slint**. Voltado à montagem e projeção de letras, Bíblia completa (66 livros), mídias, contagem regressiva, placar e avisos em cultos e eventos, com saída principal fullscreen acelerada por GPU (`wgpu` + `cosmic-text`), tela de palco independente, monitor de retorno com tema próprio, controle remoto via celular na rede local (`axum` HTTP + WebSocket), internacionalização em tempo real (**PT-BR** / **EN**) e instalador nativo `.msi` (`cargo-wix`).
 
 ---
 
 ## Principais Funcionalidades
+
+- **Estúdio de Projeção em 5 Colunas & Design System `shadcn/ui` em Rust Puro (`crates/ui`)**
+  - **Modo Louvor (5 Colunas Redimensionáveis):** barra superior de menus estilo desktop (`Menubar`), Biblioteca lateral unificada (`Letras | Texto | Áudio | Vídeo | Img`), lista/grade de slides com histórico de sessão, Monitor Ao Vivo 16:9 (`Principal | Palco | Retorno`), Ordem do Culto / Playlist Temporária + Anotações e tira vertical de miniaturas reais de Temas renderizadas pelo compositor GPU.
+  - **Modo Bíblia (Grade Canônica Colorida de 66 Livros):** grade 11×6 codificada por categorias bíblicas (Pentateuco, Históricos, Poéticos, Profetas, Evangelhos, Atos, Epístolas e Apocalipse) + grades rápidas de Capítulos e Versículos com projeção em 1 clique.
+  - **Modais de Estúdio & Diálogos Nativos (`rfd`):** Contagem Regressiva com prévia 16:9 ao vivo, Editor de Música, Estúdio de Temas, Multi-Monitor, Placar/Alerta de Palco, Escalas/Relatórios e seletores nativos de arquivos do Windows 11.
 
 - **Biblioteca de Músicas & Importação Inteligente (`crates/import`, `crates/storage`)**
   - Importação em lote de arquivos `.txt` (`UTF-8` e `ISO-8859-1` / `Windows-1252`), OpenSong XML, OpenLP (OpenLyrics) XML, PowerPoint nativo (`.pptx`) e pacote JSON próprio.
@@ -21,9 +26,9 @@ Aplicativo desktop nativo em **Rust** para **Windows** voltado à montagem e pro
 - **Mídias, Vídeo de Fundo, Contagem Regressiva & Placar (`crates/media`)**
   - Integração dinâmica via C-API com `libmpv` (`libmpv-2.dll`) para decodificação de vídeo/áudio e composição RGBA em textura `wgpu`, com fallback automático para fundos animados procedurais (`motion://aurora`, `motion://ocean`, `motion://warm`).
   - Contagem regressiva sincronizada na saída e placar manual controlado em tempo real pelo operador.
-- **Bíblia com Licenças Explícitas (`crates/storage`, `crates/import`)**
-  - Inclui sementes em **Domínio Público** (`TB1917` — Tradução Brasileira 1917 em PT-BR e `WEB` — World English Bible em EN) e importador para Zefania XML e JSON com verificação obrigatória de licença.
-  - Busca por referência (`João 3:16`, `Sl 23:1-6`) e por palavras-chave, favoritos e histórico de leitura.
+- **Bíblia Completa de 66 Livros em Domínio Público (`crates/storage`, `crates/import`)**
+  - Embute integralmente os **66 livros, 1.189 capítulos e 31.102 versículos** da **Tradução Brasileira 1917 (`TB1917` — Domínio Público)** em português, além de semente em inglês (`WEB` — World English Bible) e importador Zefania XML com verificação explícita de licença.
+  - Navegação visual instantânea por grade Livro → Capítulo → Versículo, busca por referência (`João 3:16`, `Sl 23:1-6`) e por palavras-chave, favoritos e histórico de leitura.
 - **Controle Remoto Mobile na Rede Local (`crates/control`)**
   - Servidor `axum` HTTP + WebSocket restrito à LAN e protegido por token fixo configurável, acompanhado de Web App responsivo para celular (próximo/anterior, tela preta/logo, itens do culto e alerta de palco).
 - **Escala, Relatórios, Exportação e Backup Completo**
@@ -44,7 +49,7 @@ Aplicativo desktop nativo em **Rust** para **Windows** voltado à montagem e pro
 | `overture-output` | `crates/output` | Monitores Win32, DPI V2, janelas fullscreen independentes e telemetria de latência |
 | `overture-control` | `crates/control` | API REST + WebSocket (`axum`) autenticada por token fixo + interface Web responsiva |
 | `overture-i18n` | `crates/i18n` | Dicionários completos `pt-BR` e `en` com alternância instantânea em tempo de execução |
-| `overture-ui` | `crates/ui` | Componentes nativos em Slint (`main.slint`) cobrindo as 7 telas operacionais |
+| `overture-ui` | `crates/ui` | Design system `shadcn/ui` puro em Slint (`theme`, `icons`, `components`, `bible_view`, `modals`, `main`) |
 | `overture` | `crates/app` | Executável desktop Windows integrando banco, saídas GPU, mídia, API remota e UI |
 
 ---
