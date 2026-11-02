@@ -4101,6 +4101,7 @@ dependencies = [
  "image",
  "libloading",
  "overture-core",
+ "overture-render",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -4112,7 +4113,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "overture-core",
- "overture-media",
  "overture-render",
  "pollster",
  "raw-window-handle",

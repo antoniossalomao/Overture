@@ -1,0 +1,1442 @@
+import {
+    Button,
+    LineEdit,
+    TextEdit,
+    ScrollView,
+    ComboBox,
+    CheckBox
+} from "std-widgets.slint";
+
+export struct UiStringsData {
+    app-title: string,
+    nav-control: string,
+    nav-library: string,
+    nav-song-editor: string,
+    nav-themes: string,
+    nav-monitors: string,
+    nav-schedule-reports: string,
+    nav-settings: string,
+
+    service-playlist: string,
+    temporary-playlist: string,
+    new-service: string,
+    add-announcement: string,
+    add-countdown: string,
+    quick-library: string,
+    search-placeholder: string,
+    live-output: string,
+    next-slide-preview: string,
+    btn-prev: string,
+    btn-next: string,
+    btn-black: string,
+    btn-logo: string,
+    btn-clear: string,
+    btn-auto-play: string,
+    countdown-title: string,
+    scoreboard-title: string,
+    stage-alert-placeholder: string,
+    send-alert: string,
+    clear-alert: string,
+
+    tab-songs: string,
+    tab-bible: string,
+    tab-media: string,
+    tab-archived: string,
+    import-txt-folder: string,
+    import-xml-or-pptx: string,
+    add-to-service: string,
+    project-now: string,
+    archive-item: string,
+    restore-item: string,
+    bible-favorites: string,
+    bible-history: string,
+
+    song-title: string,
+    song-artist: string,
+    song-author: string,
+    song-notes: string,
+    raw-lyrics: string,
+    auto-split-slides: string,
+    save-song: string,
+    forced-break-badge: string,
+
+    theme-name: string,
+    font-family: string,
+    font-size: string,
+    text-color: string,
+    background-kind: string,
+    shadow-toggle: string,
+    alignment: string,
+    save-theme: string,
+
+    main-output-monitor: string,
+    stage-monitor: string,
+    return-monitor: string,
+    return-theme-label: string,
+    apply-monitors: string,
+    close-outputs: string,
+    latency-label: string,
+
+    team-schedule: string,
+    member-name: string,
+    role-name: string,
+    add-to-schedule: string,
+    times-scheduled: string,
+    most-played-songs: string,
+    filter-weekday: string,
+
+    language-label: string,
+    api-token-label: string,
+    api-port-label: string,
+    shortcuts-label: string,
+    create-backup: string,
+    restore-backup: string,
+    export-json: string,
+    export-txt: string,
+    save-settings: string,
+}
+
+export struct UiPlaylistRow {
+    item-id: int,
+    row-idx: int,
+    kind-badge: string,
+    title: string,
+    subtitle: string,
+}
+
+export struct UiSlideCard {
+    slide-idx: int,
+    number-label: string,
+    body: string,
+    forced-break: bool,
+}
+
+export struct UiSongRow {
+    song-id: int,
+    title: string,
+    artist: string,
+    meta: string,
+    has-forced-break: bool,
+    duplicate-marked: bool,
+    archived: bool,
+}
+
+export struct UiBibleRow {
+    version-id: int,
+    book: string,
+    chapter: int,
+    verse: int,
+    reference: string,
+    body: string,
+}
+
+export struct UiMediaRow {
+    media-id: int,
+    name: string,
+    kind-label: string,
+    path: string,
+}
+
+export struct UiThemeRow {
+    theme-id: int,
+    name: string,
+    summary: string,
+    is-return: bool,
+}
+
+export struct UiScheduleItem {
+    entry-id: int,
+    member-name: string,
+    role-label: string,
+}
+
+export struct UiMemberCountRow {
+    member-name: string,
+    count-label: string,
+}
+
+export struct UiReportStatRow {
+    title: string,
+    artist: string,
+    count-label: string,
+}
+
+component NavPill inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked();
+
+    height: 36px;
+    horizontal-stretch: 1;
+    border-radius: 8px;
+    background: root.active ? #0ea5e9 : #1e293b;
+    border-width: 1px;
+    border-color: root.active ? #38bdf8 : #334155;
+
+    Text {
+        text: root.label;
+        color: root.active ? #041322 : #e2e8f0;
+        font-size: 13px;
+        font-weight: root.active ? 700 : 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: root.tr.app-title;
+    preferred-width: 1440px;
+    preferred-height: 880px;
+    min-width: 1120px;
+    min-height: 700px;
+    background: #090d16;
+
+    in property <UiStringsData> tr;
+    in-out property <int> active-screen: 0;
+    in-out property <int> library-tab: 0;
+    in property <string> status-banner: "Overture pronto.";
+
+    // Screen 1: Live Control models & state
+    in property <string> active-service-title: "Culto Principal";
+    in-out property <bool> is-temp-playlist: false;
+    in property <[UiPlaylistRow]> playlist-rows: [];
+    in-out property <int> selected-playlist-idx: -1;
+    in property <[UiSlideCard]> live-slides: [];
+    in property <int> active-slide-idx: 0;
+    in property <string> live-item-header: "Sem item ativo";
+    in property <string> next-slide-text: "—";
+    in property <string> stage-timer-text: "00:00";
+    in property <string> countdown-display: "00:00";
+    in property <bool> black-active: false;
+    in property <bool> logo-active: false;
+    in-out property <bool> auto-play-active: false;
+    in property <image> live-main-preview;
+    in property <image> live-stage-preview;
+
+    in-out property <string> quick-search-query: "";
+    in-out property <string> announcement-draft: "";
+    in-out property <string> countdown-mins-draft: "5";
+    in-out property <string> countdown-label-draft: "Início do Culto";
+    in-out property <string> stage-alert-draft: "";
+
+    // Manual Scoreboard properties
+    in-out property <bool> scoreboard-visible: false;
+    in-out property <string> team-a-name: "Equipe A";
+    in property <int> team-a-score: 0;
+    in-out property <string> team-b-name: "Equipe B";
+    in property <int> team-b-score: 0;
+
+    // Screen 2: Library models
+    in-out property <string> library-search-query: "";
+    in-out property <string> import-path-input: "";
+    in property <[UiSongRow]> song-rows: [];
+    in property <[string]> bible-version-names: ["TB1917 — Português (Domínio Público)", "WEB — English (Public Domain)"];
+    in-out property <int> selected-bible-version-idx: 0;
+    in property <[UiBibleRow]> bible-rows: [];
+    in property <[UiBibleRow]> bible-fav-rows: [];
+    in property <[UiBibleRow]> bible-history-rows: [];
+    in property <[UiMediaRow]> media-rows: [];
+    in-out property <string> new-media-path: "motion://aurora";
+    in property <[UiSongRow]> archived-song-rows: [];
+
+    // Screen 3: Song Editor
+    in-out property <int> editor-song-id: 0;
+    in-out property <string> editor-title: "";
+    in-out property <string> editor-artist: "";
+    in-out property <string> editor-author: "";
+    in-out property <string> editor-notes: "";
+    in-out property <string> editor-raw-lyrics: "";
+    in property <[UiSlideCard]> editor-preview-slides: [];
+
+    // Screen 4: Theme Editor
+    in property <[UiThemeRow]> theme-rows: [];
+    in-out property <int> editor-theme-id: 1;
+    in-out property <string> editor-theme-name: "Culto Principal";
+    in-out property <string> editor-font-family: "Segoe UI";
+    in-out property <string> editor-font-size: "64";
+    in-out property <string> editor-text-color: "#FFFFFF";
+    in-out property <int> editor-bg-kind-idx: 1;
+    in-out property <string> editor-bg-value: "motion://aurora";
+    in-out property <int> editor-align-idx: 1;
+    in-out property <bool> editor-shadow-enabled: true;
+    in-out property <bool> editor-is-return-theme: false;
+    in property <image> theme-editor-preview;
+
+    // Screen 5: Monitors
+    in property <[string]> monitor-choices: ["Monitor 1"];
+    in-out property <int> main-monitor-idx: 0;
+    in-out property <bool> main-monitor-enabled: false;
+    in-out property <int> stage-monitor-idx: 0;
+    in-out property <bool> stage-monitor-enabled: false;
+    in-out property <int> return-monitor-idx: 0;
+    in-out property <bool> return-monitor-enabled: false;
+    in property <[string]> return-theme-choices: ["Retorno Palco (Alto Contraste)"];
+    in-out property <int> return-theme-choice-idx: 0;
+    in property <string> latency-readout: "0.00 ms";
+
+    // Screen 6: Schedule & Reports
+    in-out property <string> schedule-member-input: "";
+    in-out property <string> schedule-role-input: "Louvor / Vocal";
+    in property <[UiScheduleItem]> current-schedule-rows: [];
+    in property <[UiMemberCountRow]> member-count-rows: [];
+    in-out property <int> report-weekday-idx: 0;
+    in-out property <string> report-from-date: "2026-01-01";
+    in-out property <string> report-to-date: "2026-12-31";
+    in property <[UiReportStatRow]> most-played-rows: [];
+
+    // Screen 7: Settings
+    in-out property <int> language-choice-idx: 0;
+    in-out property <string> settings-api-port: "8787";
+    in-out property <string> settings-api-token: "overture-local-2026";
+    in property <string> settings-lan-url: "http://127.0.0.1:8787";
+    in-out property <string> shortcut-next: "Right";
+    in-out property <string> shortcut-prev: "Left";
+    in-out property <string> shortcut-black: "B";
+    in-out property <string> shortcut-logo: "L";
+    in-out property <string> backup-path-input: "";
+
+    // Callbacks to Rust application controller
+    callback key-shortcut(string);
+    callback toggle-temp-playlist(bool);
+    callback create-new-service(string);
+    callback add-quick-announcement(string);
+    callback add-quick-countdown(string, string);
+    callback present-playlist-row(int);
+    callback remove-playlist-row(int);
+    callback goto-slide(int);
+    callback prev-slide();
+    callback next-slide();
+    callback toggle-black();
+    callback toggle-logo();
+    callback clear-output();
+    callback toggle-auto-play(bool);
+    callback start-countdown-now(string, string);
+    callback stop-countdown-now();
+    callback stage-timer-action(string);
+    callback adjust-scoreboard(int, int, bool, string, string);
+    callback trigger-stage-alert(string);
+
+    callback search-library-changed(string);
+    callback quick-search-submit(string);
+    callback import-txt-dir(string);
+    callback import-file-any(string);
+    callback song-add-to-service(int);
+    callback song-project-now(int);
+    callback song-open-editor(int);
+    callback song-set-archived(int, bool);
+    callback remove-duplicates-clicked();
+
+    callback bible-version-changed(int);
+    callback bible-search-submit(string);
+    callback bible-project-verse(int);
+    callback bible-add-service(int);
+    callback bible-favorite-verse(int);
+
+    callback add-media-item(string);
+    callback media-project-now(int);
+    callback media-add-service(int);
+
+    callback editor-preview-split();
+    callback editor-new-song();
+    callback editor-save-song();
+
+    callback select-theme-row(int);
+    callback refresh-theme-preview();
+    callback save-current-theme();
+    callback apply-theme-live();
+
+    callback apply-monitor-outputs();
+    callback close-all-outputs();
+
+    callback add-schedule-member();
+    callback remove-schedule-member(int);
+    callback refresh-reports();
+
+    callback change-language(int);
+    callback save-app-settings();
+    callback run-full-backup(string);
+    callback run-restore-backup(string);
+    callback run-export-json(string);
+    callback run-export-txt(string);
+
+    FocusScope {
+        key-pressed(event) => {
+            root.key-shortcut(event.text);
+            reject
+        }
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 10px;
+
+            // Top Navigation Bar (7 Screens)
+            Rectangle {
+                height: 52px;
+                border-radius: 10px;
+                background: #111827;
+                border-width: 1px;
+                border-color: #1f2937;
+
+                HorizontalLayout {
+                    padding: 8px;
+                    spacing: 6px;
+
+                    Rectangle {
+                        width: 145px;
+                        background: transparent;
+                        Text {
+                            text: "OVERTURE";
+                            color: #38bdf8;
+                            font-size: 16px;
+                            font-weight: 800;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    NavPill { label: root.tr.nav-control; active: root.active-screen == 0; clicked => { root.active-screen = 0; } }
+                    NavPill { label: root.tr.nav-library; active: root.active-screen == 1; clicked => { root.active-screen = 1; } }
+                    NavPill { label: root.tr.nav-song-editor; active: root.active-screen == 2; clicked => { root.active-screen = 2; } }
+                    NavPill { label: root.tr.nav-themes; active: root.active-screen == 3; clicked => { root.active-screen = 3; root.refresh-theme-preview(); } }
+                    NavPill { label: root.tr.nav-monitors; active: root.active-screen == 4; clicked => { root.active-screen = 4; } }
+                    NavPill { label: root.tr.nav-schedule-reports; active: root.active-screen == 5; clicked => { root.active-screen = 5; root.refresh-reports(); } }
+                    NavPill { label: root.tr.nav-settings; active: root.active-screen == 6; clicked => { root.active-screen = 6; } }
+                }
+            }
+
+            // ===================== SCREEN 1: CONTROLE =====================
+            if root.active-screen == 0 : HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 10px;
+
+                // Left Column: Service Playlist
+                Rectangle {
+                    width: 320px;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+
+                    VerticalLayout {
+                        padding: 10px;
+                        spacing: 8px;
+
+                        Text {
+                            text: root.tr.service-playlist + " — " + root.active-service-title;
+                            color: #f8fafc;
+                            font-size: 14px;
+                            font-weight: 700;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            CheckBox {
+                                text: root.tr.temporary-playlist;
+                                checked <=> root.is-temp-playlist;
+                                toggled => { root.toggle-temp-playlist(root.is-temp-playlist); }
+                            }
+                            Button {
+                                text: root.tr.new-service;
+                                clicked => { root.create-new-service("Culto"); }
+                            }
+                        }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for row in root.playlist-rows : Rectangle {
+                                    height: 50px;
+                                    border-radius: 6px;
+                                    background: row.row-idx == root.selected-playlist-idx ? #1e3a5f : #1e293b;
+                                    border-width: 1px;
+                                    border-color: row.row-idx == root.selected-playlist-idx ? #38bdf8 : transparent;
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 6px;
+                                        spacing: 6px;
+
+                                        TouchArea {
+                                            horizontal-stretch: 1;
+                                            clicked => {
+                                                root.selected-playlist-idx = row.row-idx;
+                                                root.present-playlist-row(row.row-idx);
+                                            }
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Text {
+                                                    text: "[" + row.kind-badge + "] " + row.title;
+                                                    color: #f8fafc;
+                                                    font-size: 13px;
+                                                    font-weight: 600;
+                                                    overflow: elide;
+                                                }
+                                                Text {
+                                                    text: row.subtitle;
+                                                    color: #94a3b8;
+                                                    font-size: 11px;
+                                                    overflow: elide;
+                                                }
+                                            }
+                                        }
+
+                                        Button {
+                                            text: "✕";
+                                            width: 30px;
+                                            clicked => { root.remove-playlist-row(row.row-idx); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: "Texto rápido de aviso...";
+                                text <=> root.announcement-draft;
+                            }
+                            Button {
+                                text: root.tr.add-announcement;
+                                clicked => {
+                                    root.add-quick-announcement(root.announcement-draft);
+                                    root.announcement-draft = "";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Center Column: Quick Lookup & Active Item Slides
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+
+                    VerticalLayout {
+                        padding: 10px;
+                        spacing: 8px;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: root.tr.search-placeholder;
+                                text <=> root.quick-search-query;
+                                accepted(val) => { root.quick-search-submit(val); }
+                            }
+                            Button {
+                                text: root.tr.project-now;
+                                clicked => { root.quick-search-submit(root.quick-search-query); }
+                            }
+                        }
+
+                        Text {
+                            text: root.live-item-header;
+                            color: #38bdf8;
+                            font-size: 14px;
+                            font-weight: 700;
+                        }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 6px;
+                                for s in root.live-slides : Rectangle {
+                                    min-height: 62px;
+                                    border-radius: 8px;
+                                    background: s.slide-idx == root.active-slide-idx ? #0c4a6e : #1e293b;
+                                    border-width: 2px;
+                                    border-color: s.slide-idx == root.active-slide-idx ? #38bdf8 : (s.forced-break ? #f59e0b : transparent);
+
+                                    TouchArea {
+                                        clicked => { root.goto-slide(s.slide-idx); }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding: 10px;
+                                        spacing: 10px;
+                                        Text {
+                                            text: s.number-label;
+                                            width: 28px;
+                                            color: #38bdf8;
+                                            font-weight: 700;
+                                            font-size: 13px;
+                                        }
+                                        Text {
+                                            horizontal-stretch: 1;
+                                            text: s.body;
+                                            color: #f8fafc;
+                                            font-size: 14px;
+                                            wrap: word-wrap;
+                                        }
+                                        if s.forced-break : Text {
+                                            text: "⚠ " + root.tr.forced-break-badge;
+                                            color: #fbbf24;
+                                            font-size: 11px;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Right Column: Live Output Preview, Transport, Countdown & Scoreboard
+                Rectangle {
+                    width: 400px;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+
+                    VerticalLayout {
+                        padding: 10px;
+                        spacing: 8px;
+
+                        HorizontalLayout {
+                            Text {
+                                text: root.tr.live-output;
+                                color: #f8fafc;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-stretch: 1;
+                            }
+                            Text {
+                                text: "Palco: " + root.stage-timer-text + " | Reg: " + root.countdown-display;
+                                color: #34d399;
+                                font-size: 12px;
+                                font-weight: 600;
+                            }
+                        }
+
+                        // Live WGPU/Compositor Preview Frame
+                        Rectangle {
+                            height: 185px;
+                            border-radius: 8px;
+                            background: #000000;
+                            border-width: 2px;
+                            border-color: root.black-active ? #ef4444 : #38bdf8;
+                            clip: true;
+
+                            Image {
+                                width: 100%;
+                                height: 100%;
+                                source: root.live-main-preview;
+                                image-fit: contain;
+                            }
+                        }
+
+                        Rectangle {
+                            height: 54px;
+                            border-radius: 6px;
+                            background: #1e293b;
+                            HorizontalLayout {
+                                padding: 8px;
+                                Text {
+                                    text: root.tr.next-slide-preview + ": " + root.next-slide-text;
+                                    color: #fbbf24;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+
+                        // Primary Transport Controls
+                        HorizontalLayout {
+                            spacing: 6px;
+                            Button { text: root.tr.btn-prev; horizontal-stretch: 1; clicked => { root.prev-slide(); } }
+                            Button { text: root.tr.btn-next; horizontal-stretch: 1; primary: true; clicked => { root.next-slide(); } }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            Button { text: root.tr.btn-black; horizontal-stretch: 1; clicked => { root.toggle-black(); } }
+                            Button { text: root.tr.btn-logo; horizontal-stretch: 1; clicked => { root.toggle-logo(); } }
+                            Button { text: root.tr.btn-clear; horizontal-stretch: 1; clicked => { root.clear-output(); } }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            CheckBox {
+                                text: root.tr.btn-auto-play;
+                                checked <=> root.auto-play-active;
+                                toggled => { root.toggle-auto-play(root.auto-play-active); }
+                            }
+                            Button { text: "▶ Cron"; clicked => { root.stage-timer-action("start"); } }
+                            Button { text: "⏸"; clicked => { root.stage-timer-action("pause"); } }
+                            Button { text: "↺"; clicked => { root.stage-timer-action("reset"); } }
+                        }
+
+                        // Countdown Quick Bar
+                        Rectangle {
+                            border-radius: 6px;
+                            background: #172033;
+                            VerticalLayout {
+                                padding: 6px;
+                                spacing: 4px;
+                                Text { text: root.tr.countdown-title; color: #94a3b8; font-size: 11px; font-weight: 700; }
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    LineEdit { width: 52px; text <=> root.countdown-mins-draft; placeholder-text: "min"; }
+                                    LineEdit { horizontal-stretch: 1; text <=> root.countdown-label-draft; }
+                                    Button {
+                                        text: "Iniciar";
+                                        clicked => { root.start-countdown-now(root.countdown-mins-draft, root.countdown-label-draft); }
+                                    }
+                                    Button { text: "■"; clicked => { root.stop-countdown-now(); } }
+                                }
+                            }
+                        }
+
+                        // Manual Scoreboard Card
+                        Rectangle {
+                            border-radius: 6px;
+                            background: #172033;
+                            VerticalLayout {
+                                padding: 6px;
+                                spacing: 4px;
+                                HorizontalLayout {
+                                    Text { text: root.tr.scoreboard-title + " (" + root.team-a-score + " × " + root.team-b-score + ")"; color: #94a3b8; font-size: 11px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
+                                    CheckBox {
+                                        text: "Exibir";
+                                        checked <=> root.scoreboard-visible;
+                                        toggled => { root.adjust-scoreboard(0, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    LineEdit { horizontal-stretch: 1; text <=> root.team-a-name; }
+                                    Button { text: "-1"; clicked => { root.adjust-scoreboard(-1, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                    Button { text: "+1"; clicked => { root.adjust-scoreboard(1, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                    LineEdit { horizontal-stretch: 1; text <=> root.team-b-name; }
+                                    Button { text: "-1"; clicked => { root.adjust-scoreboard(0, -1, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                    Button { text: "+1"; clicked => { root.adjust-scoreboard(0, 1, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                }
+                            }
+                        }
+
+                        // Stage Alert Bar
+                        HorizontalLayout {
+                            spacing: 4px;
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: root.tr.stage-alert-placeholder;
+                                text <=> root.stage-alert-draft;
+                            }
+                            Button {
+                                text: root.tr.send-alert;
+                                clicked => { root.trigger-stage-alert(root.stage-alert-draft); }
+                            }
+                            Button {
+                                text: "✕";
+                                clicked => {
+                                    root.stage-alert-draft = "";
+                                    root.trigger-stage-alert("");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ===================== SCREEN 2: BIBLIOTECA =====================
+            if root.active-screen == 1 : Rectangle {
+                vertical-stretch: 1;
+                border-radius: 10px;
+                background: #111827;
+                border-width: 1px;
+                border-color: #1f2937;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        NavPill { label: root.tr.tab-songs; active: root.library-tab == 0; clicked => { root.library-tab = 0; } }
+                        NavPill { label: root.tr.tab-bible; active: root.library-tab == 1; clicked => { root.library-tab = 1; } }
+                        NavPill { label: root.tr.tab-media; active: root.library-tab == 2; clicked => { root.library-tab = 2; } }
+                        NavPill { label: root.tr.tab-archived; active: root.library-tab == 3; clicked => { root.library-tab = 3; } }
+                    }
+
+                    // Tab 0: Songs Library
+                    if root.library-tab == 0 : VerticalLayout {
+                        vertical-stretch: 1;
+                        spacing: 8px;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: root.tr.search-placeholder;
+                                text <=> root.library-search-query;
+                                edited(txt) => { root.search-library-changed(txt); }
+                            }
+                            LineEdit {
+                                width: 320px;
+                                placeholder-text: "Caminho da pasta TXT ou arquivo XML/PPTX...";
+                                text <=> root.import-path-input;
+                            }
+                            Button { text: root.tr.import-txt-folder; clicked => { root.import-txt-dir(root.import-path-input); } }
+                            Button { text: root.tr.import-xml-or-pptx; clicked => { root.import-file-any(root.import-path-input); } }
+                            Button { text: "Dedup"; clicked => { root.remove-duplicates-clicked(); } }
+                        }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for s in root.song-rows : Rectangle {
+                                    height: 46px;
+                                    border-radius: 6px;
+                                    background: #1e293b;
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        spacing: 8px;
+                                        Text {
+                                            horizontal-stretch: 1;
+                                            text: s.title + " — " + s.artist + " (" + s.meta + ")";
+                                            color: #f8fafc;
+                                            font-size: 13px;
+                                            vertical-alignment: center;
+                                        }
+                                        if s.has-forced-break : Text { text: "⚠ Quebra forçada"; color: #fbbf24; font-size: 11px; vertical-alignment: center; }
+                                        if s.duplicate-marked : Text { text: "Duplicata Título/Artista"; color: #f87171; font-size: 11px; vertical-alignment: center; }
+                                        Button { text: root.tr.add-to-service; clicked => { root.song-add-to-service(s.song-id); } }
+                                        Button { text: root.tr.project-now; primary: true; clicked => { root.song-project-now(s.song-id); } }
+                                        Button {
+                                            text: "✎";
+                                            clicked => {
+                                                root.song-open-editor(s.song-id);
+                                                root.active-screen = 2;
+                                            }
+                                        }
+                                        Button { text: root.tr.archive-item; clicked => { root.song-set-archived(s.song-id, true); } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Tab 1: Bible
+                    if root.library-tab == 1 : VerticalLayout {
+                        vertical-stretch: 1;
+                        spacing: 8px;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            ComboBox {
+                                width: 320px;
+                                model: root.bible-version-names;
+                                current-index <=> root.selected-bible-version-idx;
+                                selected(_) => { root.bible-version-changed(root.selected-bible-version-idx); }
+                            }
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: "Ex: João 3:16, Sl 23:1-6 ou palavra-chave...";
+                                text <=> root.library-search-query;
+                                accepted(q) => { root.bible-search-submit(q); }
+                            }
+                            Button { text: "Buscar"; primary: true; clicked => { root.bible-search-submit(root.library-search-query); } }
+                        }
+
+                        HorizontalLayout {
+                            vertical-stretch: 1;
+                            spacing: 10px;
+
+                            ScrollView {
+                                horizontal-stretch: 2;
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    for b[idx] in root.bible-rows : Rectangle {
+                                        min-height: 54px;
+                                        border-radius: 6px;
+                                        background: #1e293b;
+                                        HorizontalLayout {
+                                            padding: 8px;
+                                            spacing: 8px;
+                                            Text {
+                                                width: 140px;
+                                                text: b.reference;
+                                                color: #fbbf24;
+                                                font-weight: 700;
+                                                font-size: 13px;
+                                                vertical-alignment: center;
+                                            }
+                                            Text {
+                                                horizontal-stretch: 1;
+                                                text: b.body;
+                                                color: #f8fafc;
+                                                font-size: 13px;
+                                                wrap: word-wrap;
+                                            }
+                                            Button { text: "★"; clicked => { root.bible-favorite-verse(idx); } }
+                                            Button { text: root.tr.add-to-service; clicked => { root.bible-add-service(idx); } }
+                                            Button { text: root.tr.project-now; primary: true; clicked => { root.bible-project-verse(idx); } }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: 320px;
+                                border-radius: 8px;
+                                background: #172033;
+                                VerticalLayout {
+                                    padding: 8px;
+                                    spacing: 6px;
+                                    Text { text: "★ " + root.tr.bible-favorites; color: #fbbf24; font-weight: 700; font-size: 13px; }
+                                    ScrollView {
+                                        vertical-stretch: 1;
+                                        VerticalLayout {
+                                            spacing: 4px;
+                                            for fv in root.bible-fav-rows : Text {
+                                                text: fv.reference + " — " + fv.body;
+                                                color: #e2e8f0;
+                                                font-size: 12px;
+                                                wrap: word-wrap;
+                                            }
+                                        }
+                                    }
+                                    Text { text: root.tr.bible-history; color: #38bdf8; font-weight: 700; font-size: 13px; }
+                                    ScrollView {
+                                        vertical-stretch: 1;
+                                        VerticalLayout {
+                                            spacing: 4px;
+                                            for hv in root.bible-history-rows : Text {
+                                                text: hv.reference;
+                                                color: #94a3b8;
+                                                font-size: 12px;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Tab 2: Media
+                    if root.library-tab == 2 : VerticalLayout {
+                        vertical-stretch: 1;
+                        spacing: 8px;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: "Caminho de imagem/vídeo/áudio ou motion://aurora | motion://ocean | motion://warm";
+                                text <=> root.new-media-path;
+                            }
+                            Button { text: "+ Adicionar Mídia"; primary: true; clicked => { root.add-media-item(root.new-media-path); } }
+                        }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for m in root.media-rows : Rectangle {
+                                    height: 46px;
+                                    border-radius: 6px;
+                                    background: #1e293b;
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        spacing: 8px;
+                                        Text {
+                                            horizontal-stretch: 1;
+                                            text: "[" + m.kind-label + "] " + m.name + "  (" + m.path + ")";
+                                            color: #f8fafc;
+                                            font-size: 13px;
+                                            vertical-alignment: center;
+                                        }
+                                        Button { text: root.tr.add-to-service; clicked => { root.media-add-service(m.media-id); } }
+                                        Button { text: root.tr.project-now; primary: true; clicked => { root.media-project-now(m.media-id); } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Tab 3: Archived Items
+                    if root.library-tab == 3 : ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 4px;
+                            for s in root.archived-song-rows : Rectangle {
+                                height: 46px;
+                                border-radius: 6px;
+                                background: #1e293b;
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    spacing: 8px;
+                                    Text {
+                                        horizontal-stretch: 1;
+                                        text: s.title + " — " + s.artist;
+                                        color: #94a3b8;
+                                        vertical-alignment: center;
+                                    }
+                                    Button { text: root.tr.restore-item; primary: true; clicked => { root.song-set-archived(s.song-id, false); } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ===================== SCREEN 3: EDITOR DE MÚSICA =====================
+            if root.active-screen == 2 : HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 10px;
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 8px;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.song-title; text <=> root.editor-title; }
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.song-artist; text <=> root.editor-artist; }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.song-author; text <=> root.editor-author; }
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.song-notes; text <=> root.editor-notes; }
+                        }
+
+                        Text { text: root.tr.raw-lyrics; color: #94a3b8; font-size: 12px; }
+                        TextEdit {
+                            vertical-stretch: 1;
+                            text <=> root.editor-raw-lyrics;
+                            edited(_) => { root.editor-preview-split(); }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Button { text: "+ Nova Música"; clicked => { root.editor-new-song(); } }
+                            Button { text: root.tr.auto-split-slides; clicked => { root.editor-preview-split(); } }
+                            Button { text: root.tr.save-song; primary: true; clicked => { root.editor-save-song(); } }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 460px;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 8px;
+                        Text { text: "Pré-visualização de Slides (máx. 2 linhas)"; color: #38bdf8; font-size: 14px; font-weight: 700; }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 6px;
+                                for c in root.editor-preview-slides : Rectangle {
+                                    min-height: 60px;
+                                    border-radius: 8px;
+                                    background: #1e293b;
+                                    border-width: 1px;
+                                    border-color: c.forced-break ? #f59e0b : #334155;
+                                    HorizontalLayout {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        Text { text: c.number-label; width: 28px; color: #38bdf8; font-weight: 700; }
+                                        Text { horizontal-stretch: 1; text: c.body; color: #f8fafc; wrap: word-wrap; }
+                                        if c.forced-break : Text { text: "⚠ " + root.tr.forced-break-badge; color: #fbbf24; font-size: 11px; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ===================== SCREEN 4: TEMAS =====================
+            if root.active-screen == 3 : HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 10px;
+
+                Rectangle {
+                    width: 300px;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 6px;
+                        Text { text: root.tr.nav-themes; color: #f8fafc; font-size: 15px; font-weight: 700; }
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for t in root.theme-rows : Rectangle {
+                                    height: 52px;
+                                    border-radius: 6px;
+                                    background: t.theme-id == root.editor-theme-id ? #0c4a6e : #1e293b;
+                                    TouchArea {
+                                        clicked => { root.select-theme-row(t.theme-id); }
+                                    }
+                                    VerticalLayout {
+                                        padding: 8px;
+                                        Text { text: t.name; color: #f8fafc; font-weight: 600; font-size: 13px; }
+                                        Text { text: t.summary; color: #94a3b8; font-size: 11px; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.theme-name; text <=> root.editor-theme-name; }
+                            LineEdit { width: 180px; placeholder-text: root.tr.font-family; text <=> root.editor-font-family; }
+                            LineEdit { width: 90px; placeholder-text: root.tr.font-size; text <=> root.editor-font-size; }
+                            LineEdit { width: 130px; placeholder-text: root.tr.text-color; text <=> root.editor-text-color; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            ComboBox {
+                                width: 180px;
+                                model: ["Cor Sólida", "Gradiente", "Imagem", "Vídeo / Motion"];
+                                current-index <=> root.editor-bg-kind-idx;
+                                selected(_) => { root.refresh-theme-preview(); }
+                            }
+                            LineEdit {
+                                horizontal-stretch: 1;
+                                placeholder-text: "#0B1024 ou caminho de imagem/vídeo ou motion://aurora";
+                                text <=> root.editor-bg-value;
+                            }
+                            ComboBox {
+                                width: 140px;
+                                model: ["Esquerda", "Centro", "Direita"];
+                                current-index <=> root.editor-align-idx;
+                                selected(_) => { root.refresh-theme-preview(); }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 12px;
+                            CheckBox { text: root.tr.shadow-toggle; checked <=> root.editor-shadow-enabled; toggled => { root.refresh-theme-preview(); } }
+                            CheckBox { text: "Tema para Monitor de Retorno"; checked <=> root.editor-is-return-theme; }
+                            Button { text: "Atualizar Preview"; clicked => { root.refresh-theme-preview(); } }
+                            Button { text: "Aplicar Ao Vivo"; clicked => { root.apply-theme-live(); } }
+                            Button { text: root.tr.save-theme; primary: true; clicked => { root.save-current-theme(); } }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                            border-radius: 10px;
+                            background: #000000;
+                            border-width: 2px;
+                            border-color: #334155;
+                            clip: true;
+
+                            Image {
+                                width: 100%;
+                                height: 100%;
+                                source: root.theme-editor-preview;
+                                image-fit: contain;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ===================== SCREEN 5: MONITORES =====================
+            if root.active-screen == 4 : Rectangle {
+                vertical-stretch: 1;
+                border-radius: 10px;
+                background: #111827;
+                border-width: 1px;
+                border-color: #1f2937;
+
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 16px;
+
+                    Text { text: root.tr.nav-monitors; color: #f8fafc; font-size: 18px; font-weight: 700; }
+
+                    Rectangle {
+                        border-radius: 8px;
+                        background: #1e293b;
+                        HorizontalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            CheckBox { text: root.tr.main-output-monitor; checked <=> root.main-monitor-enabled; horizontal-stretch: 1; }
+                            ComboBox { width: 360px; model: root.monitor-choices; current-index <=> root.main-monitor-idx; }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: 8px;
+                        background: #1e293b;
+                        HorizontalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            CheckBox { text: root.tr.stage-monitor; checked <=> root.stage-monitor-enabled; horizontal-stretch: 1; }
+                            ComboBox { width: 360px; model: root.monitor-choices; current-index <=> root.stage-monitor-idx; }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: 8px;
+                        background: #1e293b;
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+                            HorizontalLayout {
+                                spacing: 12px;
+                                CheckBox { text: root.tr.return-monitor; checked <=> root.return-monitor-enabled; horizontal-stretch: 1; }
+                                ComboBox { width: 360px; model: root.monitor-choices; current-index <=> root.return-monitor-idx; }
+                            }
+                            HorizontalLayout {
+                                spacing: 12px;
+                                Text { text: root.tr.return-theme-label; color: #94a3b8; vertical-alignment: center; horizontal-stretch: 1; }
+                                ComboBox { width: 360px; model: root.return-theme-choices; current-index <=> root.return-theme-choice-idx; }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Button { text: root.tr.apply-monitors; primary: true; clicked => { root.apply-monitor-outputs(); } }
+                        Button { text: root.tr.close-outputs; clicked => { root.close-all-outputs(); } }
+                        Text {
+                            text: root.tr.latency-label + ": " + root.latency-readout;
+                            color: #34d399;
+                            font-size: 14px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle { vertical-stretch: 1; background: transparent; }
+                }
+            }
+
+            // ===================== SCREEN 6: ESCALA E RELATÓRIOS =====================
+            if root.active-screen == 5 : HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 10px;
+
+                // Left: Team Schedule
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+                    VerticalLayout {
+                        padding: 14px;
+                        spacing: 8px;
+                        Text { text: root.tr.team-schedule + " — " + root.active-service-title; color: #f8fafc; font-size: 16px; font-weight: 700; }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.member-name; text <=> root.schedule-member-input; }
+                            LineEdit { horizontal-stretch: 1; placeholder-text: root.tr.role-name; text <=> root.schedule-role-input; }
+                            Button { text: root.tr.add-to-schedule; primary: true; clicked => { root.add-schedule-member(); } }
+                        }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for sc in root.current-schedule-rows : Rectangle {
+                                    height: 40px;
+                                    border-radius: 6px;
+                                    background: #1e293b;
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        Text { horizontal-stretch: 1; text: sc.member-name + " — " + sc.role-label; color: #f8fafc; vertical-alignment: center; }
+                                        Button { text: "✕"; clicked => { root.remove-schedule-member(sc.entry-id); } }
+                                    }
+                                }
+                            }
+                        }
+
+                        Text { text: root.tr.times-scheduled; color: #38bdf8; font-size: 14px; font-weight: 700; }
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for mc in root.member-count-rows : Rectangle {
+                                    height: 36px;
+                                    border-radius: 6px;
+                                    background: #172033;
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        Text { horizontal-stretch: 1; text: mc.member-name; color: #e2e8f0; vertical-alignment: center; }
+                                        Text { text: mc.count-label; color: #fbbf24; font-weight: 700; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Right: Most Played Songs Reports
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 10px;
+                    background: #111827;
+                    border-width: 1px;
+                    border-color: #1f2937;
+                    VerticalLayout {
+                        padding: 14px;
+                        spacing: 8px;
+                        Text { text: root.tr.most-played-songs; color: #f8fafc; font-size: 16px; font-weight: 700; }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            LineEdit { width: 120px; text <=> root.report-from-date; placeholder-text: "YYYY-MM-DD"; }
+                            LineEdit { width: 120px; text <=> root.report-to-date; placeholder-text: "YYYY-MM-DD"; }
+                            ComboBox {
+                                horizontal-stretch: 1;
+                                model: ["Todos os dias", "Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+                                current-index <=> root.report-weekday-idx;
+                                selected(_) => { root.refresh-reports(); }
+                            }
+                            Button { text: "Filtrar"; primary: true; clicked => { root.refresh-reports(); } }
+                        }
+
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 4px;
+                                for st in root.most-played-rows : Rectangle {
+                                    height: 42px;
+                                    border-radius: 6px;
+                                    background: #1e293b;
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        Text { horizontal-stretch: 1; text: st.title + " — " + st.artist; color: #f8fafc; vertical-alignment: center; }
+                                        Text { text: st.count-label; color: #38bdf8; font-weight: 700; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ===================== SCREEN 7: CONFIGURAÇÕES =====================
+            if root.active-screen == 6 : Rectangle {
+                vertical-stretch: 1;
+                border-radius: 10px;
+                background: #111827;
+                border-width: 1px;
+                border-color: #1f2937;
+
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 14px;
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: root.tr.language-label; width: 220px; color: #e2e8f0; vertical-alignment: center; }
+                        ComboBox {
+                            width: 260px;
+                            model: ["Português (Brasil)", "English"];
+                            current-index <=> root.language-choice-idx;
+                            selected(val) => { root.change-language(root.language-choice-idx); }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: root.tr.api-port-label; width: 220px; color: #e2e8f0; vertical-alignment: center; }
+                        LineEdit { width: 120px; text <=> root.settings-api-port; }
+                        Text { text: root.tr.api-token-label; color: #e2e8f0; vertical-alignment: center; }
+                        LineEdit { width: 240px; text <=> root.settings-api-token; }
+                        Text { text: "URL Celular: " + root.settings-lan-url; color: #38bdf8; font-weight: 700; vertical-alignment: center; }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text { text: root.tr.shortcuts-label; width: 220px; color: #e2e8f0; vertical-alignment: center; }
+                        LineEdit { width: 95px; text <=> root.shortcut-prev; placeholder-text: "Prev"; }
+                        LineEdit { width: 95px; text <=> root.shortcut-next; placeholder-text: "Next"; }
+                        LineEdit { width: 95px; text <=> root.shortcut-black; placeholder-text: "Black"; }
+                        LineEdit { width: 95px; text <=> root.shortcut-logo; placeholder-text: "Logo"; }
+                        Button { text: root.tr.save-settings; primary: true; clicked => { root.save-app-settings(); } }
+                    }
+
+                    Rectangle { height: 1px; background: #1f2937; }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        LineEdit {
+                            horizontal-stretch: 1;
+                            placeholder-text: "Caminho de destino/origem para Backup (.zip) ou pasta de Exportação...";
+                            text <=> root.backup-path-input;
+                        }
+                        Button { text: root.tr.create-backup; primary: true; clicked => { root.run-full-backup(root.backup-path-input); } }
+                        Button { text: root.tr.restore-backup; clicked => { root.run-restore-backup(root.backup-path-input); } }
+                        Button { text: root.tr.export-json; clicked => { root.run-export-json(root.backup-path-input); } }
+                        Button { text: root.tr.export-txt; clicked => { root.run-export-txt(root.backup-path-input); } }
+                    }
+
+                    Rectangle { vertical-stretch: 1; background: transparent; }
+                }
+            }
+
+            // Footer Status Bar
+            Rectangle {
+                height: 28px;
+                border-radius: 6px;
+                background: #111827;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    Text {
+                        text: root.status-banner;
+                        color: #94a3b8;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
