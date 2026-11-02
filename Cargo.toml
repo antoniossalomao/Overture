@@ -72,6 +72,8 @@ directories = "6.0"
 tempfile = "3.14"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio-tungstenite = "0.26"
+flate2 = "1.0"
+rfd = "0.15"
 
 # Optimize pixel composition & glyph rasterization in dev/test profiles for real-time 60fps output
 [profile.dev.package.overture-render]

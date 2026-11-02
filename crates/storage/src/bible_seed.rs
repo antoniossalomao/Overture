@@ -1,7 +1,245 @@
-use overture_core::{BibleVerse, BibleVersion};
+use anyhow::{Context, Result};
+use flate2::read::GzDecoder;
+use overture_core::{BackgroundSpec, BibleVerse, BibleVersion, RgbaColor, Theme, ThemeConfig};
+use serde::Deserialize;
+use std::io::Read;
 
-/// Built-in Public Domain scripture seed so Overture works out-of-the-box in both PT-BR and EN
-/// with verified public-domain licenses (`Public Domain`). Users can also import full XML/JSON Bibles.
+const TB1917_GZ: &[u8] = include_bytes!("../assets/tb1917.json.gz");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CanonicalBookInfo {
+    pub order: i32,
+    pub abbr_pt: &'static str,
+    pub name_pt: &'static str,
+    pub abbr_en: &'static str,
+    pub name_en: &'static str,
+    /// Holyrics canonical color group:
+    /// 0 = Pentateuch, 1 = Historical, 2 = Poetic, 3 = Prophets,
+    /// 4 = Gospels, 5 = Acts, 6 = Epistles, 7 = Revelation
+    pub category: u8,
+    pub chapters: i32,
+}
+
+pub const CANONICAL_BIBLE_BOOKS: [CanonicalBookInfo; 66] = [
+    // Row 1 (1..11)
+    CanonicalBookInfo { order: 1, abbr_pt: "Gn", name_pt: "Gênesis", abbr_en: "Gen", name_en: "Genesis", category: 0, chapters: 50 },
+    CanonicalBookInfo { order: 2, abbr_pt: "Ex", name_pt: "Êxodo", abbr_en: "Exo", name_en: "Exodus", category: 0, chapters: 40 },
+    CanonicalBookInfo { order: 3, abbr_pt: "Lv", name_pt: "Levítico", abbr_en: "Lev", name_en: "Leviticus", category: 0, chapters: 27 },
+    CanonicalBookInfo { order: 4, abbr_pt: "Nm", name_pt: "Números", abbr_en: "Num", name_en: "Numbers", category: 0, chapters: 36 },
+    CanonicalBookInfo { order: 5, abbr_pt: "Dt", name_pt: "Deuteronômio", abbr_en: "Deu", name_en: "Deuteronomy", category: 0, chapters: 34 },
+    CanonicalBookInfo { order: 6, abbr_pt: "Js", name_pt: "Josué", abbr_en: "Jos", name_en: "Joshua", category: 1, chapters: 24 },
+    CanonicalBookInfo { order: 7, abbr_pt: "Jz", name_pt: "Juízes", abbr_en: "Jdg", name_en: "Judges", category: 1, chapters: 21 },
+    CanonicalBookInfo { order: 8, abbr_pt: "Rt", name_pt: "Rute", abbr_en: "Rut", name_en: "Ruth", category: 1, chapters: 4 },
+    CanonicalBookInfo { order: 9, abbr_pt: "1Sm", name_pt: "1 Samuel", abbr_en: "1Sa", name_en: "1 Samuel", category: 1, chapters: 31 },
+    CanonicalBookInfo { order: 10, abbr_pt: "2Sm", name_pt: "2 Samuel", abbr_en: "2Sa", name_en: "2 Samuel", category: 1, chapters: 24 },
+    CanonicalBookInfo { order: 11, abbr_pt: "1Rs", name_pt: "1 Reis", abbr_en: "1Ki", name_en: "1 Kings", category: 1, chapters: 22 },
+    // Row 2 (12..22)
+    CanonicalBookInfo { order: 12, abbr_pt: "2Rs", name_pt: "2 Reis", abbr_en: "2Ki", name_en: "2 Kings", category: 1, chapters: 25 },
+    CanonicalBookInfo { order: 13, abbr_pt: "1Cr", name_pt: "1 Crônicas", abbr_en: "1Ch", name_en: "1 Chronicles", category: 1, chapters: 29 },
+    CanonicalBookInfo { order: 14, abbr_pt: "2Cr", name_pt: "2 Crônicas", abbr_en: "2Ch", name_en: "2 Chronicles", category: 1, chapters: 36 },
+    CanonicalBookInfo { order: 15, abbr_pt: "Ed", name_pt: "Esdras", abbr_en: "Ezr", name_en: "Ezra", category: 1, chapters: 10 },
+    CanonicalBookInfo { order: 16, abbr_pt: "Ne", name_pt: "Neemias", abbr_en: "Neh", name_en: "Nehemiah", category: 1, chapters: 13 },
+    CanonicalBookInfo { order: 17, abbr_pt: "Et", name_pt: "Ester", abbr_en: "Est", name_en: "Esther", category: 1, chapters: 10 },
+    CanonicalBookInfo { order: 18, abbr_pt: "Jó", name_pt: "Jó", abbr_en: "Job", name_en: "Job", category: 2, chapters: 42 },
+    CanonicalBookInfo { order: 19, abbr_pt: "Sl", name_pt: "Salmos", abbr_en: "Psa", name_en: "Psalms", category: 2, chapters: 150 },
+    CanonicalBookInfo { order: 20, abbr_pt: "Pv", name_pt: "Provérbios", abbr_en: "Pro", name_en: "Proverbs", category: 2, chapters: 31 },
+    CanonicalBookInfo { order: 21, abbr_pt: "Ec", name_pt: "Eclesiastes", abbr_en: "Ecc", name_en: "Ecclesiastes", category: 2, chapters: 12 },
+    CanonicalBookInfo { order: 22, abbr_pt: "Ct", name_pt: "Cantares", abbr_en: "Sng", name_en: "Song of Solomon", category: 2, chapters: 8 },
+    // Row 3 (23..33)
+    CanonicalBookInfo { order: 23, abbr_pt: "Is", name_pt: "Isaías", abbr_en: "Isa", name_en: "Isaiah", category: 3, chapters: 66 },
+    CanonicalBookInfo { order: 24, abbr_pt: "Jr", name_pt: "Jeremias", abbr_en: "Jer", name_en: "Jeremiah", category: 3, chapters: 52 },
+    CanonicalBookInfo { order: 25, abbr_pt: "Lm", name_pt: "Lamentações", abbr_en: "Lam", name_en: "Lamentations", category: 3, chapters: 5 },
+    CanonicalBookInfo { order: 26, abbr_pt: "Ez", name_pt: "Ezequiel", abbr_en: "Ezk", name_en: "Ezekiel", category: 3, chapters: 48 },
+    CanonicalBookInfo { order: 27, abbr_pt: "Dn", name_pt: "Daniel", abbr_en: "Dan", name_en: "Daniel", category: 3, chapters: 12 },
+    CanonicalBookInfo { order: 28, abbr_pt: "Os", name_pt: "Oseias", abbr_en: "Hos", name_en: "Hosea", category: 3, chapters: 14 },
+    CanonicalBookInfo { order: 29, abbr_pt: "Jl", name_pt: "Joel", abbr_en: "Jol", name_en: "Joel", category: 3, chapters: 3 },
+    CanonicalBookInfo { order: 30, abbr_pt: "Am", name_pt: "Amós", abbr_en: "Amo", name_en: "Amos", category: 3, chapters: 9 },
+    CanonicalBookInfo { order: 31, abbr_pt: "Ob", name_pt: "Obadias", abbr_en: "Oba", name_en: "Obadiah", category: 3, chapters: 1 },
+    CanonicalBookInfo { order: 32, abbr_pt: "Jn", name_pt: "Jonas", abbr_en: "Jon", name_en: "Jonah", category: 3, chapters: 4 },
+    CanonicalBookInfo { order: 33, abbr_pt: "Mq", name_pt: "Miqueias", abbr_en: "Mic", name_en: "Micah", category: 3, chapters: 7 },
+    // Row 4 (34..44)
+    CanonicalBookInfo { order: 34, abbr_pt: "Na", name_pt: "Naum", abbr_en: "Nam", name_en: "Nahum", category: 3, chapters: 3 },
+    CanonicalBookInfo { order: 35, abbr_pt: "Hc", name_pt: "Habacuque", abbr_en: "Hab", name_en: "Habakkuk", category: 3, chapters: 3 },
+    CanonicalBookInfo { order: 36, abbr_pt: "Sf", name_pt: "Sofonias", abbr_en: "Zep", name_en: "Zephaniah", category: 3, chapters: 3 },
+    CanonicalBookInfo { order: 37, abbr_pt: "Ag", name_pt: "Ageu", abbr_en: "Hag", name_en: "Haggai", category: 3, chapters: 2 },
+    CanonicalBookInfo { order: 38, abbr_pt: "Zc", name_pt: "Zacarias", abbr_en: "Zec", name_en: "Zechariah", category: 3, chapters: 14 },
+    CanonicalBookInfo { order: 39, abbr_pt: "Ml", name_pt: "Malaquias", abbr_en: "Mal", name_en: "Malachi", category: 3, chapters: 4 },
+    CanonicalBookInfo { order: 40, abbr_pt: "Mt", name_pt: "Mateus", abbr_en: "Mat", name_en: "Matthew", category: 4, chapters: 28 },
+    CanonicalBookInfo { order: 41, abbr_pt: "Mc", name_pt: "Marcos", abbr_en: "Mrk", name_en: "Mark", category: 4, chapters: 16 },
+    CanonicalBookInfo { order: 42, abbr_pt: "Lc", name_pt: "Lucas", abbr_en: "Luk", name_en: "Luke", category: 4, chapters: 24 },
+    CanonicalBookInfo { order: 43, abbr_pt: "Jo", name_pt: "João", abbr_en: "Jhn", name_en: "John", category: 4, chapters: 21 },
+    CanonicalBookInfo { order: 44, abbr_pt: "At", name_pt: "Atos", abbr_en: "Act", name_en: "Acts", category: 5, chapters: 28 },
+    // Row 5 (45..55)
+    CanonicalBookInfo { order: 45, abbr_pt: "Rm", name_pt: "Romanos", abbr_en: "Rom", name_en: "Romans", category: 6, chapters: 16 },
+    CanonicalBookInfo { order: 46, abbr_pt: "1Co", name_pt: "1 Coríntios", abbr_en: "1Co", name_en: "1 Corinthians", category: 6, chapters: 16 },
+    CanonicalBookInfo { order: 47, abbr_pt: "2Co", name_pt: "2 Coríntios", abbr_en: "2Co", name_en: "2 Corinthians", category: 6, chapters: 13 },
+    CanonicalBookInfo { order: 48, abbr_pt: "Gl", name_pt: "Gálatas", abbr_en: "Gal", name_en: "Galatians", category: 6, chapters: 6 },
+    CanonicalBookInfo { order: 49, abbr_pt: "Ef", name_pt: "Efésios", abbr_en: "Eph", name_en: "Ephesians", category: 6, chapters: 6 },
+    CanonicalBookInfo { order: 50, abbr_pt: "Fp", name_pt: "Filipenses", abbr_en: "Php", name_en: "Philippians", category: 6, chapters: 4 },
+    CanonicalBookInfo { order: 51, abbr_pt: "Cl", name_pt: "Colossenses", abbr_en: "Col", name_en: "Colossians", category: 6, chapters: 4 },
+    CanonicalBookInfo { order: 52, abbr_pt: "1Ts", name_pt: "1 Tessalonicenses", abbr_en: "1Th", name_en: "1 Thessalonians", category: 6, chapters: 5 },
+    CanonicalBookInfo { order: 53, abbr_pt: "2Ts", name_pt: "2 Tessalonicenses", abbr_en: "2Th", name_en: "2 Thessalonians", category: 6, chapters: 3 },
+    CanonicalBookInfo { order: 54, abbr_pt: "1Tm", name_pt: "1 Timóteo", abbr_en: "1Ti", name_en: "1 Timothy", category: 6, chapters: 6 },
+    CanonicalBookInfo { order: 55, abbr_pt: "2Tm", name_pt: "2 Timóteo", abbr_en: "2Ti", name_en: "2 Timothy", category: 6, chapters: 4 },
+    // Row 6 (56..66)
+    CanonicalBookInfo { order: 56, abbr_pt: "Tt", name_pt: "Tito", abbr_en: "Tit", name_en: "Titus", category: 6, chapters: 3 },
+    CanonicalBookInfo { order: 57, abbr_pt: "Fm", name_pt: "Filemom", abbr_en: "Phm", name_en: "Philemon", category: 6, chapters: 1 },
+    CanonicalBookInfo { order: 58, abbr_pt: "Hb", name_pt: "Hebreus", abbr_en: "Heb", name_en: "Hebrews", category: 6, chapters: 13 },
+    CanonicalBookInfo { order: 59, abbr_pt: "Tg", name_pt: "Tiago", abbr_en: "Jas", name_en: "James", category: 6, chapters: 5 },
+    CanonicalBookInfo { order: 60, abbr_pt: "1Pe", name_pt: "1 Pedro", abbr_en: "1Pe", name_en: "1 Peter", category: 6, chapters: 5 },
+    CanonicalBookInfo { order: 61, abbr_pt: "2Pe", name_pt: "2 Pedro", abbr_en: "2Pe", name_en: "2 Peter", category: 6, chapters: 3 },
+    CanonicalBookInfo { order: 62, abbr_pt: "1Jo", name_pt: "1 João", abbr_en: "1Jn", name_en: "1 John", category: 6, chapters: 5 },
+    CanonicalBookInfo { order: 63, abbr_pt: "2Jo", name_pt: "2 João", abbr_en: "2Jn", name_en: "2 John", category: 6, chapters: 1 },
+    CanonicalBookInfo { order: 64, abbr_pt: "3Jo", name_pt: "3 João", abbr_en: "3Jn", name_en: "3 John", category: 6, chapters: 1 },
+    CanonicalBookInfo { order: 65, abbr_pt: "Jd", name_pt: "Judas", abbr_en: "Jud", name_en: "Jude", category: 6, chapters: 1 },
+    CanonicalBookInfo { order: 66, abbr_pt: "Ap", name_pt: "Apocalipse", abbr_en: "Rev", name_en: "Revelation", category: 7, chapters: 22 },
+];
+
+pub fn canonical_book_by_order(order: i32) -> Option<&'static CanonicalBookInfo> {
+    CANONICAL_BIBLE_BOOKS
+        .iter()
+        .find(|b| b.order == order)
+}
+
+#[derive(Deserialize)]
+struct RawJsonBook {
+    name: String,
+    chapters: Vec<Vec<String>>,
+}
+
+/// Decompresses the embedded complete 66-book Public Domain Portuguese Bible (`TB1917`).
+pub fn load_full_tb1917_verses(version_id: i64) -> Result<Vec<BibleVerse>> {
+    let mut decoder = GzDecoder::new(TB1917_GZ);
+    let mut json_str = String::with_capacity(4_100_000);
+    decoder
+        .read_to_string(&mut json_str)
+        .context("Failed to decompress embedded tb1917.json.gz")?;
+
+    let raw_books: Vec<RawJsonBook> =
+        serde_json::from_str(&json_str).context("Failed to parse embedded tb1917.json")?;
+
+    let mut verses = Vec::with_capacity(31_150);
+    for (book_idx, raw_book) in raw_books.into_iter().enumerate() {
+        let book_order = (book_idx + 1) as i32;
+        let canonical_name = canonical_book_by_order(book_order)
+            .map(|c| c.name_pt.to_string())
+            .unwrap_or(raw_book.name);
+
+        for (chap_idx, raw_chap) in raw_book.chapters.into_iter().enumerate() {
+            let chapter = (chap_idx + 1) as i32;
+            for (verse_idx, verse_text) in raw_chap.into_iter().enumerate() {
+                let verse = (verse_idx + 1) as i32;
+                verses.push(BibleVerse {
+                    version_id,
+                    book: canonical_name.clone(),
+                    book_order,
+                    chapter,
+                    verse,
+                    text: verse_text,
+                });
+            }
+        }
+    }
+    Ok(verses)
+}
+
+/// Rich studio preset themes for the Holyrics-style visual theme strip.
+pub fn default_studio_themes() -> Vec<Theme> {
+    let mut noire = ThemeConfig::default();
+    noire.background = BackgroundSpec::Gradient {
+        top: RgbaColor::new(14, 14, 18, 255),
+        bottom: RgbaColor::new(5, 5, 8, 255),
+    };
+
+    let mut aurora = ThemeConfig::default();
+    aurora.background = BackgroundSpec::Video {
+        path: "motion://aurora".to_string(),
+        loop_playback: true,
+        dim_opacity: 0.25,
+    };
+
+    let mut ocean = ThemeConfig::default();
+    ocean.background = BackgroundSpec::Video {
+        path: "motion://ocean".to_string(),
+        loop_playback: true,
+        dim_opacity: 0.25,
+    };
+
+    let mut warm = ThemeConfig::default();
+    warm.background = BackgroundSpec::Video {
+        path: "motion://warm".to_string(),
+        loop_playback: true,
+        dim_opacity: 0.25,
+    };
+
+    let mut purple = ThemeConfig::default();
+    purple.background = BackgroundSpec::Gradient {
+        top: RgbaColor::new(38, 16, 68, 255),
+        bottom: RgbaColor::new(10, 5, 22, 255),
+    };
+
+    let mut emerald = ThemeConfig::default();
+    emerald.background = BackgroundSpec::Gradient {
+        top: RgbaColor::new(8, 48, 38, 255),
+        bottom: RgbaColor::new(4, 16, 14, 255),
+    };
+
+    let mut crimson = ThemeConfig::default();
+    crimson.background = BackgroundSpec::Gradient {
+        top: RgbaColor::new(58, 14, 24, 255),
+        bottom: RgbaColor::new(16, 4, 8, 255),
+    };
+
+    vec![
+        Theme {
+            id: 0,
+            name: "Noite Estrelada".to_string(),
+            is_return_theme: false,
+            config: noire,
+        },
+        Theme::default_main(),
+        Theme {
+            id: 0,
+            name: "Aurora Boreal (Motion)".to_string(),
+            is_return_theme: false,
+            config: aurora,
+        },
+        Theme {
+            id: 0,
+            name: "Oceano Profundo (Motion)".to_string(),
+            is_return_theme: false,
+            config: ocean,
+        },
+        Theme {
+            id: 0,
+            name: "Âmbar Adoração (Motion)".to_string(),
+            is_return_theme: false,
+            config: warm,
+        },
+        Theme {
+            id: 0,
+            name: "Roxo Majestade".to_string(),
+            is_return_theme: false,
+            config: purple,
+        },
+        Theme {
+            id: 0,
+            name: "Esmeralda Suave".to_string(),
+            is_return_theme: false,
+            config: emerald,
+        },
+        Theme {
+            id: 0,
+            name: "Vinho Aliança".to_string(),
+            is_return_theme: false,
+            config: crimson,
+        },
+        Theme::default_scripture(),
+        Theme::default_return_monitor(),
+    ]
+}
+
+/// Fast lightweight seed used in in-memory unit tests, plus initial metadata for file DBs.
 pub fn builtin_public_domain_bibles() -> Vec<(BibleVersion, Vec<BibleVerse>)> {
     let pt_version = BibleVersion {
         id: 1,
@@ -95,8 +333,6 @@ pub fn builtin_public_domain_bibles() -> Vec<(BibleVersion, Vec<BibleVerse>)> {
     vec![(pt_version, pt_verses), (en_version, en_verses)]
 }
 
-/// Parses human scripture references in PT-BR or EN such as:
-/// - `"João 3:16"`, `"Jo 3:16"`, `"Salmos 23:1-6"`, `"Sl 23"`, `"John 3:16"`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedBibleRef {
     pub book_query: String,
@@ -111,7 +347,6 @@ pub fn parse_bible_reference(query: &str) -> Option<ParsedBibleRef> {
         return None;
     }
 
-    // Split right-most whitespace separating book name (possibly starting with "1 " / "2 ") from chapter[:verse]
     let last_space = trimmed.rfind(' ')?;
     let raw_book = trimmed[..last_space].trim();
     let numbers_part = trimmed[last_space + 1..].trim();
@@ -152,22 +387,33 @@ pub fn parse_bible_reference(query: &str) -> Option<ParsedBibleRef> {
 }
 
 fn expand_book_alias(alias: &str) -> String {
-    match crate::accent::fold_search_text(alias).as_str() {
-        "gn" | "gen" => "genesis".to_string(),
-        "ex" | "exo" => "exodo".to_string(),
-        "sl" | "sal" | "salmo" | "ps" | "psa" => "salmos".to_string(),
-        "pv" | "prov" => "proverbios".to_string(),
-        "is" | "isa" => "isaias".to_string(),
-        "mt" | "mat" => "mateus".to_string(),
-        "mc" | "mar" => "marcos".to_string(),
-        "lc" | "luc" => "lucas".to_string(),
-        "jo" | "joao" => "joao".to_string(),
-        "jn" | "jhn" => "john".to_string(),
-        "at" | "atos" => "atos".to_string(),
-        "rm" | "rom" => "romanos".to_string(),
-        "fp" | "fil" | "flp" => "filipenses".to_string(),
-        "hb" | "heb" => "hebreus".to_string(),
-        "ap" | "apo" | "apoc" | "rev" => "apocalipse".to_string(),
+    let folded = crate::accent::fold_search_text(alias);
+    let compact = folded.replace(' ', "");
+    for b in &CANONICAL_BIBLE_BOOKS {
+        if crate::accent::fold_search_text(b.abbr_pt) == compact
+            || crate::accent::fold_search_text(b.abbr_en) == compact
+            || crate::accent::fold_search_text(b.name_pt).replace(' ', "") == compact
+            || crate::accent::fold_search_text(b.name_en).replace(' ', "") == compact
+        {
+            // Keep English query if user explicitly typed an English-only book name like "john"
+            if folded == "john" || folded == "jhn" {
+                return "john".to_string();
+            }
+            return crate::accent::fold_search_text(b.name_pt);
+        }
+    }
+    match folded.as_str() {
+        "sal" | "salmo" | "ps" | "psa" => "salmos".to_string(),
+        "prov" => "proverbios".to_string(),
+        "isa" => "isaias".to_string(),
+        "mat" => "mateus".to_string(),
+        "mar" => "marcos".to_string(),
+        "luc" => "lucas".to_string(),
+        "jn" => "john".to_string(),
+        "rom" => "romanos".to_string(),
+        "fil" | "flp" => "filipenses".to_string(),
+        "heb" => "hebreus".to_string(),
+        "apo" | "apoc" | "rev" => "apocalipse".to_string(),
         other => other.to_string(),
     }
 }

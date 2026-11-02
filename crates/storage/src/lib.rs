@@ -7,7 +7,10 @@ pub mod service_resolver;
 
 pub use accent::{canonical_lyrics_key, fold_search_text};
 pub use backup::{BackupManifest, create_full_backup, restore_full_backup};
-pub use bible_seed::{ParsedBibleRef, builtin_public_domain_bibles, parse_bible_reference};
+pub use bible_seed::{
+    CANONICAL_BIBLE_BOOKS, CanonicalBookInfo, ParsedBibleRef, builtin_public_domain_bibles,
+    canonical_book_by_order, default_studio_themes, load_full_tb1917_verses, parse_bible_reference,
+};
 
 use anyhow::{Context, Result};
 use overture_core::{
@@ -54,6 +57,7 @@ impl Storage {
 
         let storage = Self { pool };
         storage.init_schema_and_seeds().await?;
+        storage.ensure_studio_presets_and_full_bible().await?;
         Ok(storage)
     }
 
@@ -108,6 +112,66 @@ impl Storage {
         if bible_count == 0 {
             for (ver, verses) in builtin_public_domain_bibles() {
                 self.import_bible_version(&ver, &verses).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Populates rich studio themes and the complete 66-book Public Domain TB1917 Bible
+    /// for persistent desktop databases without slowing down in-memory unit tests.
+    async fn ensure_studio_presets_and_full_bible(&self) -> Result<()> {
+        let existing_themes = self.list_themes().await?;
+        if existing_themes.len() <= 3 {
+            for preset in default_studio_themes() {
+                if !existing_themes
+                    .iter()
+                    .any(|t| t.name.eq_ignore_ascii_case(&preset.name))
+                {
+                    let mut t = preset;
+                    t.id = 0;
+                    self.save_theme(&t).await?;
+                }
+            }
+        }
+
+        if let Some(tb_id) =
+            sqlx::query_scalar::<_, i64>("SELECT id FROM bible_versions WHERE abbr = 'TB1917' LIMIT 1")
+                .fetch_optional(&self.pool)
+                .await?
+        {
+            let count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM bible_verses WHERE version_id = ?",
+            )
+            .bind(tb_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+            if count < 10_000 {
+                tracing::info!("Seeding complete 66-book Public Domain TB1917 Bible into SQLite...");
+                let all_verses = load_full_tb1917_verses(tb_id)?;
+                let mut tx = self.pool.begin().await?;
+                for chunk in all_verses.chunks(400) {
+                    let mut qb = sqlx::QueryBuilder::new(
+                        "INSERT OR REPLACE INTO bible_verses (version_id, book, book_order, chapter, verse, text, search_blob) ",
+                    );
+                    qb.push_values(chunk, |mut b, v| {
+                        let blob = fold_search_text(&format!(
+                            "{} {} {} {}",
+                            v.book, v.chapter, v.verse, v.text
+                        ));
+                        b.push_bind(tb_id)
+                            .push_bind(&v.book)
+                            .push_bind(v.book_order)
+                            .push_bind(v.chapter)
+                            .push_bind(v.verse)
+                            .push_bind(&v.text)
+                            .push_bind(blob);
+                    });
+                    qb.build().execute(&mut *tx).await?;
+                }
+                tx.commit().await?;
+                tracing::info!("Seeded {} verses of TB1917", all_verses.len());
             }
         }
 
@@ -814,6 +878,46 @@ impl Storage {
         Ok(version_id)
     }
 
+    /// Lists all verses of a specific book (`1..=66`) and chapter (`1..=N`) for the Holyrics Bible Grid.
+    pub async fn list_bible_chapter_verses(
+        &self,
+        version_id: i64,
+        book_order: i32,
+        chapter: i32,
+    ) -> Result<Vec<BibleVerse>> {
+        let rows = sqlx::query(
+            r#"SELECT version_id, book, book_order, chapter, verse, text
+               FROM bible_verses
+               WHERE version_id = ? AND book_order = ? AND chapter = ?
+               ORDER BY verse ASC"#,
+        )
+        .bind(version_id)
+        .bind(book_order)
+        .bind(chapter)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(row_to_bible_verse).collect())
+    }
+
+    /// Returns the number of chapters available for `book_order`, falling back to canonical count.
+    pub async fn count_bible_chapters(&self, version_id: i64, book_order: i32) -> Result<i32> {
+        let max_ch: Option<i32> = sqlx::query_scalar(
+            "SELECT MAX(chapter) FROM bible_verses WHERE version_id = ? AND book_order = ?",
+        )
+        .bind(version_id)
+        .bind(book_order)
+        .fetch_optional(&self.pool)
+        .await?
+        .flatten();
+
+        let canonical = canonical_book_by_order(book_order)
+            .map(|b| b.chapters)
+            .unwrap_or(1);
+
+        Ok(max_ch.unwrap_or(canonical).max(canonical))
+    }
+
     pub async fn search_bible(
         &self,
         version_id: i64,
@@ -1304,10 +1408,15 @@ mod tests {
 
         let store = Storage::connect_file(&db_path).await?;
 
-        // Seeded Bible reference & text search
+        // Seeded Bible reference & text search (complete 66-book TB1917: "Pois assim amou Deus ao mundo...")
         let jo316 = store.search_bible(1, "João 3:16", 10).await?;
         assert_eq!(jo316.len(), 1);
-        assert!(jo316[0].text.contains("Deus amou o mundo"));
+        assert!(jo316[0].text.contains("amou") && jo316[0].text.contains("mundo"));
+
+        let gen1 = store.list_bible_chapter_verses(1, 1, 1).await?;
+        assert_eq!(gen1.len(), 31);
+        let rev22 = store.list_bible_chapter_verses(1, 66, 22).await?;
+        assert_eq!(rev22.len(), 21);
 
         let sl23 = store.search_bible(1, "Sl 23:1-3", 10).await?;
         assert_eq!(sl23.len(), 3);
