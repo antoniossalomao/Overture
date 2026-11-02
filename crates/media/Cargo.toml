@@ -9,6 +9,7 @@ description = "Video background and media playback engine via libmpv"
 
 [dependencies]
 overture-core.workspace = true
+overture-render.workspace = true
 libloading.workspace = true
 image.workspace = true
 thiserror.workspace = true
