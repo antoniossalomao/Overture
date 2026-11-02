@@ -66,6 +66,7 @@ pub enum DisplayMode {
     Normal,
     BlackScreen,
     Logo,
+    ClearText,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -167,6 +168,7 @@ pub enum CoreCommand {
     },
     ToggleBlackScreen,
     ToggleLogo,
+    ToggleClearText,
     ClearPresentation,
     SetMainTheme {
         theme: Box<ThemeConfig>,
@@ -352,6 +354,13 @@ impl StateEngine {
                         DisplayMode::Normal
                     } else {
                         DisplayMode::Logo
+                    };
+                }
+                CoreCommand::ToggleClearText => {
+                    st.display_mode = if st.display_mode == DisplayMode::ClearText {
+                        DisplayMode::Normal
+                    } else {
+                        DisplayMode::ClearText
                     };
                 }
                 CoreCommand::ClearPresentation => {

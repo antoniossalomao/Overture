@@ -388,7 +388,9 @@ impl SlideCompositor {
         let box_h = height.saturating_sub((margin_y as u32) * 2).max(32);
         let font_px = (theme.font_size * scale).max(12.0);
 
-        if let Some(slide) = state.current_slide() {
+        if state.display_mode != DisplayMode::ClearText
+            && let Some(slide) = state.current_slide()
+        {
             if !slide.text.trim().is_empty() {
                 self.draw_text_block(
                     &mut frame,
@@ -508,6 +510,7 @@ impl SlideCompositor {
                 let mode_tag = match state.display_mode {
                     DisplayMode::BlackScreen => " [TELA PRETA]",
                     DisplayMode::Logo => " [LOGO]",
+                    DisplayMode::ClearText => " [SEM TEXTO]",
                     DisplayMode::Normal => "",
                 };
                 format!(
