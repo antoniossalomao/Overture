@@ -1,0 +1,1127 @@
+// Holyrics Studio Modals styled with shadcn/ui Dialog aesthetics
+import { ShadTheme } from "theme.slint";
+import { LucideIcon } from "icons.slint";
+import {
+    ShadButton,
+    ShadIconButton,
+    ShadInput,
+    ShadTextarea,
+    ShadSwitch,
+    ShadCheckbox,
+    ShadBadge,
+    ShadTabStrip,
+    ShadSelect,
+    ShadScrollArea
+} from "components.slint";
+
+export struct UiSlideCard {
+    slide-idx: int,
+    number-label: string,
+    body: string,
+    forced-break: bool,
+}
+
+export struct UiScheduleRow {
+    schedule-id: int,
+    member-name: string,
+    role: string,
+    total-times: int,
+}
+
+export struct UiReportRow {
+    title: string,
+    artist: string,
+    executions: int,
+}
+
+export struct UiThemeRow {
+    theme-id: int,
+    name: string,
+    is-return: bool,
+    summary: string,
+    thumbnail: image,
+}
+
+component ModalShell inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <length> modal-width: 860px;
+    in property <length> modal-height: 560px;
+    callback close();
+
+    width: 100%;
+    height: 100%;
+    background: #000000b8;
+
+    // Eat background clicks & close on outside click
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(root.modal-width, parent.width - 32px);
+        height: min(root.modal-height, parent.height - 32px);
+        background: ShadTheme.bg;
+        border-radius: ShadTheme.radius-lg;
+        border-width: 1px;
+        border-color: ShadTheme.border-strong;
+        drop-shadow-blur: 32px;
+        drop-shadow-color: #000000dd;
+
+        // Block clicks from bubbling to backdrop
+        TouchArea {}
+
+        VerticalLayout {
+            spacing: 0px;
+
+            // Dialog Header
+            Rectangle {
+                height: 44px;
+                background: ShadTheme.bg-bar;
+                border-radius: ShadTheme.radius-lg;
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 10px;
+                    spacing: 10px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: root.title;
+                            font-size: 13.5px;
+                            font-weight: 600;
+                            color: ShadTheme.fg;
+                            vertical-alignment: center;
+                        }
+                        if root.subtitle != "" : Text {
+                            text: root.subtitle;
+                            font-size: 11.5px;
+                            color: ShadTheme.fg-subtle;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        ShadIconButton {
+                            icon: "x";
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+                Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+            }
+
+            // Dialog Body
+            Rectangle {
+                vertical-stretch: 1;
+                background: transparent;
+                @children
+            }
+        }
+    }
+}
+
+// ==================== 1. COUNTDOWN MODAL (HOLYRICS SCREENSHOT 3) ====================
+export component CountdownStudioModal inherits ModalShell {
+    in-out property <int> mode-idx: 0; // 0 = Determinar tempo, 1 = Hora exata
+    in-out property <string> minutes: "10";
+    in-out property <string> seconds: "00";
+    in-out property <string> text-before: "";
+    in-out property <string> text-after: "Para iniciar o culto";
+    in-out property <bool> pad-zero: true;
+    in-out property <bool> hide-zero-min: false;
+    in property <image> preview-bg-image;
+
+    callback start-countdown(string, string, string, string, int); // mins, secs, before, after, mode
+    callback add-countdown-to-service(string, string, string);
+    callback stop-countdown();
+
+    title: "Contagem regressiva";
+    subtitle: "Sincronizada em tempo real na saída principal e palco";
+    modal-width: 940px;
+    modal-height: 560px;
+
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 14px;
+
+        // Left Config Column (Screenshot 3 left pane)
+        Rectangle {
+            width: 265px;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 10px;
+
+                ShadTabStrip {
+                    tabs: ["Determinar tempo", "Hora exata"];
+                    active-index <=> root.mode-idx;
+                }
+
+                // Minutos : Segundos
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: center;
+                    VerticalLayout {
+                        spacing: 3px;
+                        Text { text: root.mode-idx == 0 ? "Minutos" : "Hora (0-23)"; font-size: 10.5px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
+                        ShadInput { width: 84px; text <=> root.minutes; placeholder: "10"; }
+                    }
+                    VerticalLayout {
+                        alignment: end;
+                        Text { text: ":"; font-size: 18px; font-weight: 700; color: ShadTheme.fg; height: 30px; vertical-alignment: center; }
+                    }
+                    VerticalLayout {
+                        spacing: 3px;
+                        Text { text: root.mode-idx == 0 ? "Segundos" : "Minuto (0-59)"; font-size: 10.5px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
+                        ShadInput { width: 84px; text <=> root.seconds; placeholder: "00"; }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 4px;
+                    Text { text: "Texto antes"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadTextarea { height: 54px; text <=> root.text-before; placeholder: "Opcional (acima do relógio)..."; }
+                }
+
+                VerticalLayout {
+                    spacing: 6px;
+                    ShadCheckbox { label: "Preencher zero à esquerda"; checked <=> root.pad-zero; }
+                    ShadCheckbox { label: "Ocultar minuto zero"; checked <=> root.hide-zero-min; }
+                }
+
+                VerticalLayout {
+                    spacing: 4px;
+                    Text { text: "Texto depois"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadTextarea { height: 64px; text <=> root.text-after; placeholder: "Para iniciar o culto"; }
+                }
+
+                Rectangle { vertical-stretch: 1; }
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    ShadButton {
+                        horizontal-stretch: 1;
+                        icon: "play";
+                        label: "Apresentar";
+                        variant: "default";
+                        clicked => {
+                            root.start-countdown(root.minutes, root.seconds, root.text-before, root.text-after, root.mode-idx);
+                            root.close();
+                        }
+                    }
+                    ShadButton {
+                        icon: "plus";
+                        label: "Ao Culto";
+                        variant: "secondary";
+                        clicked => {
+                            root.add-countdown-to-service(root.minutes, root.seconds, root.text-after);
+                            root.close();
+                        }
+                    }
+                }
+                ShadButton {
+                    icon: "stop";
+                    label: "Parar Contagem Ativa";
+                    variant: "outline";
+                    clicked => { root.stop-countdown(); }
+                }
+            }
+        }
+
+        // Right Large 16:9 Live Preview (Screenshot 3 right pane)
+        Rectangle {
+            horizontal-stretch: 1;
+            background: #050507;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border-strong;
+            clip: true;
+
+            Image {
+                width: 100%;
+                height: 100%;
+                image-fit: cover;
+                opacity: 0.45;
+                source: root.preview-bg-image;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 14px;
+                padding: 24px;
+
+                if root.text-before != "" : Text {
+                    text: root.text-before;
+                    font-size: 26px;
+                    font-weight: 600;
+                    color: #e4e4e7;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: (root.minutes == "" ? "00" : root.minutes) + ":" + (root.seconds == "" ? "00" : root.seconds);
+                    font-size: 92px;
+                    font-weight: 800;
+                    color: #ffffff;
+                    horizontal-alignment: center;
+                }
+
+                if root.text-after != "" : Text {
+                    text: root.text-after;
+                    font-size: 34px;
+                    font-weight: 700;
+                    color: #ffffff;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}
+
+// ==================== 2. SONG EDITOR MODAL ====================
+export component SongEditorStudioModal inherits ModalShell {
+    in-out property <int> song-id: 0;
+    in-out property <string> song-title: "";
+    in-out property <string> song-artist: "";
+    in-out property <string> song-author: "";
+    in-out property <string> song-notes: "";
+    in-out property <string> raw-lyrics: "";
+    in property <[UiSlideCard]> preview-slides: [];
+
+    callback auto-split();
+    callback save-song();
+    callback new-blank-song();
+
+    title: "Editor de Música";
+    subtitle: "Divisão automática PT-BR (máx. 2 linhas, preservação de estrofes e preposições)";
+    modal-width: 960px;
+    modal-height: 620px;
+
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 14px;
+
+        // Left: Metadata & Raw Lyrics
+        VerticalLayout {
+            horizontal-stretch: 56;
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Título da Música"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.song-title; placeholder: "Ex: Emaús + Consagração"; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Artista / Ministério"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.song-artist; placeholder: "Ex: Morada / IBAB"; }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Autor / Compositor"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.song-author; placeholder: "Opcional"; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Observações / Tom / BPM"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.song-notes; placeholder: "Ex: Tom D • 72 BPM"; }
+                }
+            }
+
+            Text {
+                text: "Letra (separe estrofes com uma linha em branco)";
+                font-size: 11px;
+                color: ShadTheme.fg-muted;
+            }
+
+            ShadTextarea {
+                vertical-stretch: 1;
+                text <=> root.raw-lyrics;
+                placeholder: "Cole ou digite a letra aqui...";
+                edited => { root.auto-split(); }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                ShadButton {
+                    icon: "plus";
+                    label: "Limpar / Nova";
+                    variant: "outline";
+                    clicked => { root.new-blank-song(); }
+                }
+                ShadButton {
+                    icon: "repeat";
+                    label: "Redividir Slides";
+                    variant: "secondary";
+                    clicked => { root.auto-split(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                ShadButton {
+                    icon: "check";
+                    label: "Salvar na Biblioteca";
+                    variant: "default";
+                    clicked => {
+                        root.save-song();
+                        root.close();
+                    }
+                }
+            }
+        }
+
+        // Right: Live Slide Cards Preview
+        Rectangle {
+            horizontal-stretch: 44;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+
+            VerticalLayout {
+                padding: 10px;
+                spacing: 8px;
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text {
+                        text: "Prévia dos Slides (" + root.preview-slides.length + ")";
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: ShadTheme.fg;
+                    }
+                    ShadBadge { text: "Máx. 2 linhas"; variant: "sky"; }
+                }
+
+                ShadScrollArea {
+                    vertical-stretch: 1;
+                    content-height: sp-vbox.preferred-height + 8px;
+
+                    sp-vbox := VerticalLayout {
+                        width: parent.width;
+                        spacing: 6px;
+                        for sc in root.preview-slides : Rectangle {
+                            min-height: 56px;
+                            background: ShadTheme.card;
+                            border-radius: ShadTheme.radius-sm;
+                            border-width: 1px;
+                            border-color: sc.forced-break ? ShadTheme.amber-border : ShadTheme.border;
+
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 4px;
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text { text: "Slide " + sc.number-label; font-size: 10px; font-weight: 600; color: ShadTheme.fg-subtle; }
+                                    if sc.forced-break : ShadBadge { text: "quebra_forcada"; variant: "amber"; }
+                                }
+                                Text {
+                                    text: sc.body;
+                                    font-size: 12px;
+                                    color: ShadTheme.fg;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== 3. THEME STUDIO MODAL ====================
+export component ThemeStudioModal inherits ModalShell {
+    in property <[UiThemeRow]> themes-list: [];
+    in-out property <int> edit-id: 0;
+    in-out property <string> edit-name: "Culto Principal";
+    in-out property <string> edit-font-family: "Segoe UI";
+    in-out property <string> edit-font-size: "64";
+    in-out property <string> edit-text-color: "#FFFFFF";
+    in-out property <int> edit-bg-kind: 1; // 0 Solid, 1 Gradient, 2 Image, 3 Video/Motion
+    in-out property <string> edit-bg-primary: "#0B132B";
+    in-out property <string> edit-bg-secondary: "#1C2541";
+    in-out property <string> edit-bg-media: "motion://aurora";
+    in-out property <bool> edit-shadow: true;
+    in-out property <bool> edit-is-return: false;
+    in-out property <int> edit-align: 1; // 0 Left, 1 Center, 2 Right
+    in property <image> theme-preview-image;
+
+    callback select-theme-for-edit(int);
+    callback pick-theme-media-file();
+    callback refresh-preview();
+    callback save-theme();
+
+    title: "Estúdio de Temas";
+    subtitle: "Tipografia, gradiente, sombra e fundos animados em vídeo / motion";
+    modal-width: 960px;
+    modal-height: 600px;
+
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 14px;
+
+        // Left: Saved Themes List
+        Rectangle {
+            width: 220px;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 6px;
+                ShadButton {
+                    icon: "plus";
+                    label: "Novo Tema em Branco";
+                    variant: "secondary";
+                    clicked => {
+                        root.edit-id = 0;
+                        root.edit-name = "Novo Tema";
+                        root.refresh-preview();
+                    }
+                }
+                ShadScrollArea {
+                    vertical-stretch: 1;
+                    content-height: th-vbox.preferred-height + 8px;
+                    th-vbox := VerticalLayout {
+                        width: parent.width;
+                        spacing: 4px;
+                        for tr in root.themes-list : Rectangle {
+                            height: 44px;
+                            border-radius: ShadTheme.radius-sm;
+                            border-width: 1px;
+                            border-color: tr.theme-id == root.edit-id ? ShadTheme.live-blue-bright : ShadTheme.border-subtle;
+                            background: tr.theme-id == root.edit-id ? ShadTheme.live-row-bg :
+                                        (trta.has-hover ? ShadTheme.muted-hover : ShadTheme.card);
+                            HorizontalLayout {
+                                padding: 6px;
+                                spacing: 8px;
+                                Rectangle {
+                                    width: 48px; height: 28px;
+                                    border-radius: 3px;
+                                    background: #000000;
+                                    clip: true;
+                                    Image { width: 100%; height: 100%; image-fit: cover; source: tr.thumbnail; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    alignment: center;
+                                    Text { text: tr.name; font-size: 11.5px; font-weight: 600; color: ShadTheme.fg; overflow: elide; }
+                                    Text { text: tr.summary; font-size: 9.5px; color: ShadTheme.fg-muted; overflow: elide; }
+                                }
+                            }
+                            trta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.select-theme-for-edit(tr.theme-id); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Middle: Theme Controls
+        VerticalLayout {
+            width: 310px;
+            spacing: 8px;
+
+            VerticalLayout {
+                spacing: 3px;
+                Text { text: "Nome do Tema"; font-size: 11px; color: ShadTheme.fg-muted; }
+                ShadInput { text <=> root.edit-name; edited => { root.refresh-preview(); } }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 2; spacing: 3px;
+                    Text { text: "Fonte"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.edit-font-family; edited => { root.refresh-preview(); } }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Tam. (pt)"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.edit-font-size; edited => { root.refresh-preview(); } }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Cor do Texto"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.edit-text-color; edited => { root.refresh-preview(); } }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Alinhamento"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadTabStrip {
+                        tabs: ["Esq", "Centro", "Dir"];
+                        active-index <=> root.edit-align;
+                        changed => { root.refresh-preview(); }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 3px;
+                Text { text: "Tipo de Fundo"; font-size: 11px; color: ShadTheme.fg-muted; }
+                ShadTabStrip {
+                    tabs: ["Sólido", "Gradiente", "Imagem", "Vídeo"];
+                    active-index <=> root.edit-bg-kind;
+                    changed => { root.refresh-preview(); }
+                }
+            }
+
+            if root.edit-bg-kind == 0 || root.edit-bg-kind == 1 : HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Cor Principal / Topo"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.edit-bg-primary; edited => { root.refresh-preview(); } }
+                }
+                if root.edit-bg-kind == 1 : VerticalLayout {
+                    horizontal-stretch: 1; spacing: 3px;
+                    Text { text: "Cor Base"; font-size: 11px; color: ShadTheme.fg-muted; }
+                    ShadInput { text <=> root.edit-bg-secondary; edited => { root.refresh-preview(); } }
+                }
+            }
+
+            if root.edit-bg-kind == 2 || root.edit-bg-kind == 3 : VerticalLayout {
+                spacing: 5px;
+                Text { text: "Arquivo ou Motion URI"; font-size: 11px; color: ShadTheme.fg-muted; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    ShadInput {
+                        horizontal-stretch: 1;
+                        text <=> root.edit-bg-media;
+                        edited => { root.refresh-preview(); }
+                    }
+                    ShadButton {
+                        icon: "folder";
+                        label: "Arquivo...";
+                        clicked => { root.pick-theme-media-file(); }
+                    }
+                }
+                if root.edit-bg-kind == 3 : HorizontalLayout {
+                    spacing: 4px;
+                    ShadButton { size: "xs"; label: "Aurora"; clicked => { root.edit-bg-media = "motion://aurora"; root.refresh-preview(); } }
+                    ShadButton { size: "xs"; label: "Oceano"; clicked => { root.edit-bg-media = "motion://ocean"; root.refresh-preview(); } }
+                    ShadButton { size: "xs"; label: "Âmbar"; clicked => { root.edit-bg-media = "motion://warm"; root.refresh-preview(); } }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 16px;
+                ShadSwitch { label: "Sombra suave"; checked <=> root.edit-shadow; toggled => { root.refresh-preview(); } }
+                ShadSwitch { label: "Tema de Retorno"; checked <=> root.edit-is-return; toggled => { root.refresh-preview(); } }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            ShadButton {
+                icon: "check";
+                label: "Salvar Tema";
+                variant: "default";
+                clicked => {
+                    root.save-theme();
+                    root.close();
+                }
+            }
+        }
+
+        // Right: Live Rendered 16:9 Preview
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 8px;
+            Text { text: "Pré-visualização em Tempo Real (Compositor GPU)"; font-size: 11.5px; color: ShadTheme.fg-muted; }
+            Rectangle {
+                height: 230px;
+                background: #000000;
+                border-radius: ShadTheme.radius-md;
+                border-width: 1px;
+                border-color: ShadTheme.border-strong;
+                clip: true;
+                Image { width: 100%; height: 100%; image-fit: contain; source: root.theme-preview-image; }
+            }
+        }
+    }
+}
+
+// ==================== 4. DISPLAY / MULTI-MONITOR MODAL ====================
+export component DisplaySettingsModal inherits ModalShell {
+    in property <[string]> monitor-options: ["Desativado"];
+    in-out property <int> main-monitor-idx: 0;
+    in-out property <int> stage-monitor-idx: 0;
+    in-out property <int> return-monitor-idx: 0;
+    in property <[string]> return-theme-options: ["Retorno Palco (Alto Contraste)"];
+    in-out property <int> return-theme-idx: 0;
+    in property <string> latency-text: "—";
+
+    callback refresh-monitors();
+    callback apply-outputs();
+    callback close-all-outputs();
+
+    title: "Configurações de Exibição (Multi-Monitor)";
+    subtitle: "Saída Principal Fullscreen, Tela de Palco e Monitor de Retorno independentes";
+    modal-width: 640px;
+    modal-height: 460px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        Rectangle {
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 10px;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text { width: 220px; text: "Saída Principal (Projetor / Telão)"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
+                    ShadSelect { horizontal-stretch: 1; model: root.monitor-options; current-index <=> root.main-monitor-idx; }
+                }
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text { width: 220px; text: "Tela de Palco (Atual + Próximo + Relógio)"; font-size: 12px; color: ShadTheme.fg-secondary; vertical-alignment: center; }
+                    ShadSelect { horizontal-stretch: 1; model: root.monitor-options; current-index <=> root.stage-monitor-idx; }
+                }
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text { width: 220px; text: "Monitor de Retorno (Tema Próprio)"; font-size: 12px; color: ShadTheme.fg-secondary; vertical-alignment: center; }
+                    ShadSelect { horizontal-stretch: 1; model: root.monitor-options; current-index <=> root.return-monitor-idx; }
+                }
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text { width: 220px; text: "Tema do Monitor de Retorno"; font-size: 12px; color: ShadTheme.fg-muted; vertical-alignment: center; }
+                    ShadSelect { horizontal-stretch: 1; model: root.return-theme-options; current-index <=> root.return-theme-idx; }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+            ShadBadge { text: "Telemetria GPU (wgpu DirectX 12): " + root.latency-text; variant: "emerald"; }
+            ShadButton { icon: "repeat"; label: "Atualizar Lista de Monitores"; size: "xs"; variant: "ghost"; clicked => { root.refresh-monitors(); } }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: 8px;
+            ShadButton {
+                icon: "stop";
+                label: "Fechar Saídas Fullscreen";
+                variant: "destructive";
+                clicked => { root.close-all-outputs(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            ShadButton {
+                icon: "monitor";
+                label: "Aplicar e Abrir nos Monitores";
+                variant: "default";
+                clicked => {
+                    root.apply-outputs();
+                    root.close();
+                }
+            }
+        }
+    }
+}
+
+// ==================== 5. SCOREBOARD & STAGE ALERT MODAL ====================
+export component ScoreboardAlertModal inherits ModalShell {
+    in-out property <string> stage-alert-text: "";
+    in-out property <bool> scoreboard-visible: false;
+    in-out property <string> team-a-name: "Equipe A";
+    in-out property <string> team-b-name: "Equipe B";
+    in property <int> team-a-score: 0;
+    in property <int> team-b-score: 0;
+    in property <string> stage-timer-display: "00:00";
+
+    callback send-stage-alert(string);
+    callback stage-timer-cmd(string);
+    callback adjust-score(int, int, bool, string, string);
+
+    title: "Ferramentas ao Vivo — Alerta de Palco, Cronômetro e Placar";
+    subtitle: "Controles manuais instantâneos para gincanas, avisos de equipe e tempo de púlpito";
+    modal-width: 700px;
+    modal-height: 480px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        // Stage Alert + Stage Timer
+        Rectangle {
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                Text { text: "Mensagem de Alerta (Palco e Retorno)"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    ShadInput { horizontal-stretch: 1; text <=> root.stage-alert-text; placeholder: "Ex: Encerrar em 2 minutos / Pai do Pedro na recepção..."; }
+                    ShadButton { icon: "message"; label: "Enviar"; variant: "sky"; clicked => { root.send-stage-alert(root.stage-alert-text); } }
+                    ShadButton { icon: "x"; label: "Limpar"; variant: "outline"; clicked => { root.stage-alert-text = ""; root.send-stage-alert(""); } }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: space-between;
+                    Text { text: "Cronômetro de Púlpito (Tela de Palco): " + root.stage-timer-display; font-size: 12px; color: ShadTheme.fg-muted; vertical-alignment: center; }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        ShadButton { size: "xs"; icon: "play"; label: "Iniciar"; clicked => { root.stage-timer-cmd("start"); } }
+                        ShadButton { size: "xs"; icon: "pause"; label: "Pausar"; clicked => { root.stage-timer-cmd("pause"); } }
+                        ShadButton { size: "xs"; icon: "repeat"; label: "Zerar"; clicked => { root.stage-timer-cmd("reset"); } }
+                    }
+                }
+            }
+        }
+
+        // Manual Scoreboard
+        Rectangle {
+            vertical-stretch: 1;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+            VerticalLayout {
+                padding: 14px;
+                spacing: 12px;
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Placar Manual na Saída Principal"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; }
+                    ShadSwitch {
+                        label: "Exibir Placar no Projetor";
+                        checked <=> root.scoreboard-visible;
+                        toggled(v) => { root.adjust-score(0, 0, v, root.team-a-name, root.team-b-name); }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 20px;
+                    // Team A
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: ShadTheme.card;
+                        border-radius: ShadTheme.radius-md;
+                        border-width: 1px;
+                        border-color: ShadTheme.border;
+                        VerticalLayout {
+                            padding: 12px; spacing: 8px; alignment: center;
+                            ShadInput { text <=> root.team-a-name; accepted => { root.adjust-score(0, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                            Text { text: root.team-a-score; font-size: 44px; font-weight: 800; color: ShadTheme.live-blue-bright; horizontal-alignment: center; }
+                            HorizontalLayout {
+                                spacing: 6px; alignment: center;
+                                ShadButton { label: "-1"; size: "xs"; clicked => { root.adjust-score(-1, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                ShadButton { label: "+1"; size: "xs"; variant: "default"; clicked => { root.adjust-score(1, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                ShadButton { label: "+5"; size: "xs"; clicked => { root.adjust-score(5, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                            }
+                        }
+                    }
+
+                    // Team B
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: ShadTheme.card;
+                        border-radius: ShadTheme.radius-md;
+                        border-width: 1px;
+                        border-color: ShadTheme.border;
+                        VerticalLayout {
+                            padding: 12px; spacing: 8px; alignment: center;
+                            ShadInput { text <=> root.team-b-name; accepted => { root.adjust-score(0, 0, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                            Text { text: root.team-b-score; font-size: 44px; font-weight: 800; color: ShadTheme.amber; horizontal-alignment: center; }
+                            HorizontalLayout {
+                                spacing: 6px; alignment: center;
+                                ShadButton { label: "-1"; size: "xs"; clicked => { root.adjust-score(0, -1, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                ShadButton { label: "+1"; size: "xs"; variant: "default"; clicked => { root.adjust-score(0, 1, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                                ShadButton { label: "+5"; size: "xs"; clicked => { root.adjust-score(0, 5, root.scoreboard-visible, root.team-a-name, root.team-b-name); } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== 6. SCHEDULE & REPORTS MODAL ====================
+export component ScheduleReportsModal inherits ModalShell {
+    in-out property <string> member-input: "";
+    in-out property <string> role-input: "";
+    in property <[UiScheduleRow]> schedule-rows: [];
+    in property <[UiReportRow]> report-rows: [];
+    in property <[string]> weekday-options: ["Todos os dias", "Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+    in-out property <int> weekday-idx: 0;
+
+    callback add-schedule(string, string);
+    callback remove-schedule(int);
+    callback filter-weekday(int);
+
+    title: "Escala da Equipe e Relatórios de Execução";
+    subtitle: "Histórico de participações na escala e músicas mais tocadas por período/dia da semana";
+    modal-width: 900px;
+    modal-height: 540px;
+
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 14px;
+
+        // Left: Team Schedule
+        Rectangle {
+            horizontal-stretch: 1;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                Text { text: "Escala do Culto Atual"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    ShadInput { horizontal-stretch: 1; text <=> root.member-input; placeholder: "Nome do integrante..."; }
+                    ShadInput { width: 130px; text <=> root.role-input; placeholder: "Função (ex: Vocal)"; }
+                    ShadButton {
+                        icon: "plus";
+                        label: "Escalar";
+                        variant: "default";
+                        clicked => {
+                            root.add-schedule(root.member-input, root.role-input);
+                            root.member-input = "";
+                        }
+                    }
+                }
+
+                ShadScrollArea {
+                    vertical-stretch: 1;
+                    content-height: sch-vbox.preferred-height + 8px;
+                    sch-vbox := VerticalLayout {
+                        width: parent.width;
+                        spacing: 4px;
+                        for sr in root.schedule-rows : Rectangle {
+                            height: 36px;
+                            background: ShadTheme.card;
+                            border-radius: ShadTheme.radius-sm;
+                            border-width: 1px;
+                            border-color: ShadTheme.border-subtle;
+                            HorizontalLayout {
+                                padding-left: 10px; padding-right: 6px; spacing: 8px;
+                                Text { horizontal-stretch: 1; text: sr.member-name + " — " + sr.role; font-size: 12px; color: ShadTheme.fg; vertical-alignment: center; overflow: elide; }
+                                VerticalLayout { alignment: center; ShadBadge { text: sr.total-times + "x escalado"; variant: "sky"; } }
+                                VerticalLayout { alignment: center; ShadIconButton { icon: "trash"; danger: true; clicked => { root.remove-schedule(sr.schedule-id); } } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Right: Most Played Songs Report
+        Rectangle {
+            horizontal-stretch: 1;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Músicas Mais Tocadas"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
+                    ShadSelect {
+                        width: 155px;
+                        model: root.weekday-options;
+                        current-index <=> root.weekday-idx;
+                        selected(idx) => { root.filter-weekday(idx); }
+                    }
+                }
+
+                ShadScrollArea {
+                    vertical-stretch: 1;
+                    content-height: rep-vbox.preferred-height + 8px;
+                    rep-vbox := VerticalLayout {
+                        width: parent.width;
+                        spacing: 4px;
+                        for rr in root.report-rows : Rectangle {
+                            height: 36px;
+                            background: ShadTheme.card;
+                            border-radius: ShadTheme.radius-sm;
+                            border-width: 1px;
+                            border-color: ShadTheme.border-subtle;
+                            HorizontalLayout {
+                                padding-left: 10px; padding-right: 10px; spacing: 8px;
+                                Text { horizontal-stretch: 1; text: rr.title + (rr.artist != "" ? " (" + rr.artist + ")" : ""); font-size: 12px; color: ShadTheme.fg; vertical-alignment: center; overflow: elide; }
+                                VerticalLayout { alignment: center; ShadBadge { text: rr.executions + " execuções"; variant: "emerald"; } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== 7. SETTINGS, REMOTE LAN & BACKUP MODAL ====================
+export component SettingsRemoteModal inherits ModalShell {
+    in-out property <int> locale-idx: 0;
+    in-out property <string> api-port: "4875";
+    in-out property <string> api-token: "overture-local";
+    in property <string> remote-lan-url: "http://localhost:4875";
+    in-out property <string> shortcut-prev: "Left";
+    in-out property <string> shortcut-next: "Right";
+    in-out property <string> shortcut-black: "B";
+    in-out property <string> shortcut-logo: "L";
+
+    callback change-locale(int);
+    callback save-settings();
+    callback trigger-backup-dialog();
+    callback trigger-restore-dialog();
+    callback trigger-export-txt-dialog();
+    callback trigger-export-json-dialog();
+
+    title: "Configurações, Controle Remoto Mobile & Backup";
+    subtitle: "Idioma em tempo real, API HTTP/WebSocket na rede local, atalhos e backup completo";
+    modal-width: 780px;
+    modal-height: 520px;
+
+    HorizontalLayout {
+        padding: 16px;
+        spacing: 14px;
+
+        // Left: Language, Remote API & Shortcuts
+        VerticalLayout {
+            horizontal-stretch: 55;
+            spacing: 10px;
+
+            Rectangle {
+                background: ShadTheme.panel;
+                border-radius: ShadTheme.radius-md;
+                border-width: 1px;
+                border-color: ShadTheme.border;
+                VerticalLayout {
+                    padding: 12px; spacing: 8px;
+                    Text { text: "Idioma da Interface (Tempo Real)"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
+                    ShadTabStrip {
+                        tabs: ["Português (Brasil)", "English"];
+                        active-index <=> root.locale-idx;
+                        changed(idx) => { root.change-locale(idx); }
+                    }
+                }
+            }
+
+            Rectangle {
+                background: ShadTheme.panel;
+                border-radius: ShadTheme.radius-md;
+                border-width: 1px;
+                border-color: ShadTheme.border;
+                VerticalLayout {
+                    padding: 12px; spacing: 8px;
+                    HorizontalLayout {
+                        alignment: space-between;
+                        Text { text: "Controle Remoto pelo Celular (Rede Local)"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
+                        ShadBadge { text: root.remote-lan-url; variant: "sky"; }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        VerticalLayout {
+                            width: 100px; spacing: 3px;
+                            Text { text: "Porta LAN"; font-size: 11px; color: ShadTheme.fg-muted; }
+                            ShadInput { text <=> root.api-port; }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1; spacing: 3px;
+                            Text { text: "Token Fixo de Autenticação"; font-size: 11px; color: ShadTheme.fg-muted; }
+                            ShadInput { text <=> root.api-token; }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                background: ShadTheme.panel;
+                border-radius: ShadTheme.radius-md;
+                border-width: 1px;
+                border-color: ShadTheme.border;
+                VerticalLayout {
+                    padding: 12px; spacing: 8px;
+                    Text { text: "Atalhos de Teclado"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Anterior"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-prev; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Próximo"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-next; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Tela Preta"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-black; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Modo Logo"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-logo; } }
+                    }
+                }
+            }
+
+            ShadButton {
+                icon: "check";
+                label: "Salvar Configurações";
+                variant: "default";
+                clicked => { root.save-settings(); }
+            }
+        }
+
+        // Right: Backup & Export
+        Rectangle {
+            horizontal-stretch: 45;
+            background: ShadTheme.panel;
+            border-radius: ShadTheme.radius-md;
+            border-width: 1px;
+            border-color: ShadTheme.border;
+
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+                Text { text: "Backup Completo & Exportação"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; }
+                Text {
+                    text: "O backup completo (.zip) gera um snapshot consistente do banco SQLite (VACUUM INTO) junto com todos os arquivos da pasta de mídias.";
+                    font-size: 11px;
+                    color: ShadTheme.fg-muted;
+                    wrap: word-wrap;
+                }
+
+                ShadButton { icon: "folder"; label: "Criar Backup Completo (.zip)..."; variant: "default"; clicked => { root.trigger-backup-dialog(); } }
+                ShadButton { icon: "repeat"; label: "Restaurar Backup (.zip)..."; variant: "secondary"; clicked => { root.trigger-restore-dialog(); } }
+
+                Rectangle { height: 1px; background: ShadTheme.border; }
+                Text { text: "Exportar Biblioteca"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
+
+                ShadButton { icon: "list"; label: "Exportar Músicas em TXT..."; variant: "outline"; clicked => { root.trigger-export-txt-dialog(); } }
+                ShadButton { icon: "share"; label: "Exportar Pacote JSON..."; variant: "outline"; clicked => { root.trigger-export-json-dialog(); } }
+
+                Rectangle { vertical-stretch: 1; }
+                Text { text: "Overture v0.1.0 • Rust Puro • GPL-3.0"; font-size: 10.5px; color: ShadTheme.fg-subtle; horizontal-alignment: center; }
+            }
+        }
+    }
+}

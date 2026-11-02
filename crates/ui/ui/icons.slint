@@ -1,0 +1,223 @@
+// Crisp vector Lucide-style icons rendered directly on GPU via Slint Path
+
+export component LucideIcon inherits Rectangle {
+    in property <string> name: "play";
+    in property <color> tint: #fafafa;
+    in property <length> icon-size: 14px;
+
+    width: root.icon-size;
+    height: root.icon-size;
+    background: transparent;
+
+    // Filled / stroked vector paths (24x24 viewbox)
+    if root.name == "play" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        commands: "M6 4 L20 12 L6 20 Z";
+    }
+    if root.name == "pause" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        commands: "M6 4 H10 V20 H6 Z M14 4 H18 V20 H14 Z";
+    }
+    if root.name == "stop" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        commands: "M5 5 H19 V19 H5 Z";
+    }
+    if root.name == "skip-next" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        commands: "M5 4 L15 12 L5 20 Z M17 5 H19 V19 H17 Z";
+    }
+    if root.name == "skip-prev" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        commands: "M19 4 L9 12 L19 20 Z M5 5 H7 V19 H5 Z";
+    }
+    if root.name == "chevron-left" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M15 18 L9 12 L15 6";
+    }
+    if root.name == "chevron-right" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M9 18 L15 12 L9 6";
+    }
+    if root.name == "chevron-down" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M6 9 L12 15 L18 9";
+    }
+    if root.name == "chevron-up" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M18 15 L12 9 L6 15";
+    }
+    if root.name == "check" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.6px; fill: transparent;
+        commands: "M20 6 L9 17 L4 12";
+    }
+    if root.name == "x" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M18 6 L6 18 M6 6 L18 18";
+    }
+    if root.name == "plus" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M12 5 V19 M5 12 H19";
+    }
+    if root.name == "minus" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2.2px; fill: transparent;
+        commands: "M5 12 H19";
+    }
+    if root.name == "search" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M11 4 A7 7 0 1 0 11 18 A7 7 0 1 0 11 4 M20 20 L16.2 16.2";
+    }
+    if root.name == "book" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M4 19.5 A2.5 2.5 0 0 1 6.5 17 H20 M6.5 2 H20 V22 H6.5 A2.5 2.5 0 0 1 4 19.5 V4.5 A2.5 2.5 0 0 1 6.5 2 Z M12 6 V13 M9 9 H15";
+    }
+    if root.name == "music" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M9 18 V5 L21 3 V16 M6 15 A3 3 0 1 0 6 21 A3 3 0 1 0 6 15 M18 13 A3 3 0 1 0 18 19 A3 3 0 1 0 18 13";
+    }
+    if root.name == "edit" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M17 3 L21 7 L8 20 H4 V16 Z";
+    }
+    if root.name == "trash" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M3 6 H21 M8 6 V4 H16 V6 M6 6 L7 20 H17 L18 6 M10 11 V16 M14 11 V16";
+    }
+    if root.name == "palette" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M12 2 A10 10 0 0 0 2 12 A10 10 0 0 0 12 22 H14 A2.5 2.5 0 0 0 16.5 19.5 A2.5 2.5 0 0 1 19 17 H20 A2 2 0 0 0 22 15 A10 10 0 0 0 12 2 Z M7.5 10.5 H7.6 M12 7.5 H12.1 M16.5 10.5 H16.6";
+    }
+    if root.name == "monitor" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M2 4 H22 V16 H2 Z M8 20 H16 M12 16 V20";
+    }
+    if root.name == "grid" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M3 3 H10 V10 H3 Z M14 3 H21 V10 H14 Z M14 14 H21 V21 H14 Z M3 14 H10 V21 H3 Z";
+    }
+    if root.name == "list" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M8 6 H21 M8 12 H21 M8 18 H21 M3 6 H4 M3 12 H4 M3 18 H4";
+    }
+    if root.name == "repeat" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M17 2 L21 6 L17 10 M3 11 V9 A3 3 0 0 1 6 6 H21 M7 22 L3 18 L7 14 M21 13 V15 A3 3 0 0 1 18 18 H3";
+    }
+    if root.name == "clock" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M12 2 A10 10 0 1 0 12 22 A10 10 0 1 0 12 2 M12 6 V12 L16 14";
+    }
+    if root.name == "trophy" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M6 9 H4 A2 2 0 0 1 2 7 V5 H6 M18 9 H20 A2 2 0 0 0 22 7 V5 H18 M6 4 H18 V10 A6 6 0 0 1 6 10 Z M12 16 V20 M8 20 H16";
+    }
+    if root.name == "heart" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M12 21 L4.5 13.5 A5 5 0 0 1 11.5 6.5 L12 7 L12.5 6.5 A5 5 0 0 1 19.5 13.5 Z";
+    }
+    if root.name == "heart-fill" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        commands: "M12 21 L4.5 13.5 A5 5 0 0 1 11.5 6.5 L12 7 L12.5 6.5 A5 5 0 0 1 19.5 13.5 Z";
+    }
+    if root.name == "history" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M3 12 A9 9 0 1 0 6 5.3 L3 8 M3 3 V8 H8 M12 7 V12 L15 14";
+    }
+    if root.name == "message" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M21 15 A2 2 0 0 1 19 17 H7 L3 21 V5 A2 2 0 0 1 5 3 H19 A2 2 0 0 1 21 5 Z";
+    }
+    if root.name == "settings" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M12 8 A4 4 0 1 0 12 16 A4 4 0 1 0 12 8 M12 2 V4 M12 20 V22 M4.9 4.9 L6.3 6.3 M17.7 17.7 L19.1 19.1 M2 12 H4 M20 12 H22 M4.9 19.1 L6.3 17.7 M17.7 6.3 L19.1 4.9";
+    }
+    if root.name == "share" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M18 5 A3 3 0 1 0 18 11 A3 3 0 1 0 18 5 M6 9 A3 3 0 1 0 6 15 A3 3 0 1 0 6 9 M18 13 A3 3 0 1 0 18 19 A3 3 0 1 0 18 13 M8.6 13.5 L15.4 17.5 M15.4 6.5 L8.6 10.5";
+    }
+    if root.name == "folder" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M22 19 A2 2 0 0 1 20 21 H4 A2 2 0 0 1 2 19 V5 A2 2 0 0 1 4 3 H9 L11 6 H20 A2 2 0 0 1 22 8 Z";
+    }
+    if root.name == "eye-off" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M2 12 C5 7 9 5 12 5 C15 5 19 7 22 12 C19 17 15 19 12 19 C9 19 5 17 2 12 Z M3 3 L21 21";
+    }
+    if root.name == "users" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M16 21 V19 A4 4 0 0 0 12 15 H6 A4 4 0 0 0 2 19 V21 M9 3 A4 4 0 1 0 9 11 A4 4 0 1 0 9 3 M22 21 V19 A4 4 0 0 0 19 15.1 M16 3.1 A4 4 0 0 1 16 10.9";
+    }
+    if root.name == "chart" : Path {
+        width: 100%; height: 100%;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint; stroke-width: 2px; fill: transparent;
+        commands: "M18 20 V10 M12 20 V4 M6 20 V14";
+    }
+}

@@ -1,97 +1,28 @@
-//! Native Slint desktop UI components and localization adapter for Overture.
+//! Native Slint desktop UI components (Holyrics Studio + shadcn/ui design system) for Overture.
 
 slint::include_modules!();
 
-use overture_i18n::{Locale, strings_for};
+use overture_i18n::Locale;
 
 pub fn ui_strings_for_locale(locale: Locale) -> UiStringsData {
-    let s = strings_for(locale);
-    UiStringsData {
-        app_title: s.app_title.into(),
-        nav_control: s.nav_control.into(),
-        nav_library: s.nav_library.into(),
-        nav_song_editor: s.nav_song_editor.into(),
-        nav_themes: s.nav_themes.into(),
-        nav_monitors: s.nav_monitors.into(),
-        nav_schedule_reports: s.nav_schedule_reports.into(),
-        nav_settings: s.nav_settings.into(),
-
-        service_playlist: s.service_playlist.into(),
-        temporary_playlist: s.temporary_playlist.into(),
-        new_service: s.new_service.into(),
-        add_announcement: s.add_announcement.into(),
-        add_countdown: s.add_countdown.into(),
-        quick_library: s.quick_library.into(),
-        search_placeholder: s.search_placeholder.into(),
-        live_output: s.live_output.into(),
-        next_slide_preview: s.next_slide_preview.into(),
-        btn_prev: s.btn_prev.into(),
-        btn_next: s.btn_next.into(),
-        btn_black: s.btn_black.into(),
-        btn_logo: s.btn_logo.into(),
-        btn_clear: s.btn_clear.into(),
-        btn_auto_play: s.btn_auto_play.into(),
-        countdown_title: s.countdown_title.into(),
-        scoreboard_title: s.scoreboard_title.into(),
-        stage_alert_placeholder: s.stage_alert_placeholder.into(),
-        send_alert: s.send_alert.into(),
-        clear_alert: s.clear_alert.into(),
-
-        tab_songs: s.tab_songs.into(),
-        tab_bible: s.tab_bible.into(),
-        tab_media: s.tab_media.into(),
-        tab_archived: s.tab_archived.into(),
-        import_txt_folder: s.import_txt_folder.into(),
-        import_xml_or_pptx: s.import_xml_or_pptx.into(),
-        add_to_service: s.add_to_service.into(),
-        project_now: s.project_now.into(),
-        archive_item: s.archive_item.into(),
-        restore_item: s.restore_item.into(),
-        bible_favorites: s.bible_favorites.into(),
-        bible_history: s.bible_history.into(),
-
-        song_title: s.song_title.into(),
-        song_artist: s.song_artist.into(),
-        song_author: s.song_author.into(),
-        song_notes: s.song_notes.into(),
-        raw_lyrics: s.raw_lyrics.into(),
-        auto_split_slides: s.auto_split_slides.into(),
-        save_song: s.save_song.into(),
-        forced_break_badge: s.forced_break_badge.into(),
-
-        theme_name: s.theme_name.into(),
-        font_family: s.font_family.into(),
-        font_size: s.font_size.into(),
-        text_color: s.text_color.into(),
-        background_kind: s.background_kind.into(),
-        shadow_toggle: s.shadow_toggle.into(),
-        alignment: s.alignment.into(),
-        save_theme: s.save_theme.into(),
-
-        main_output_monitor: s.main_output_monitor.into(),
-        stage_monitor: s.stage_monitor.into(),
-        return_monitor: s.return_monitor.into(),
-        return_theme_label: s.return_theme_label.into(),
-        apply_monitors: s.apply_monitors.into(),
-        close_outputs: s.close_outputs.into(),
-        latency_label: s.latency_label.into(),
-
-        team_schedule: s.team_schedule.into(),
-        member_name: s.member_name.into(),
-        role_name: s.role_name.into(),
-        add_to_schedule: s.add_to_schedule.into(),
-        times_scheduled: s.times_scheduled.into(),
-        most_played_songs: s.most_played_songs.into(),
-        filter_weekday: s.filter_weekday.into(),
-
-        language_label: s.language_label.into(),
-        api_token_label: s.api_token_label.into(),
-        api_port_label: s.api_port_label.into(),
-        shortcuts_label: s.shortcuts_label.into(),
-        create_backup: s.create_backup.into(),
-        restore_backup: s.restore_backup.into(),
-        export_json: s.export_json.into(),
-        export_txt: s.export_txt.into(),
-        save_settings: s.save_settings.into(),
+    match locale {
+        Locale::PtBr => UiStringsData {
+            app_title: "Overture".into(),
+            go_to_bible: "Ir para Bíblia".into(),
+            search_placeholder: "Pesquisar... (Ctrl+F)".into(),
+            temporary_label: "Temporário".into(),
+            themes_label: "Temas".into(),
+            display_settings: "Configurações de exibição".into(),
+            save_theme_for_song: "Salvar Tema para Música".into(),
+        },
+        Locale::En => UiStringsData {
+            app_title: "Overture".into(),
+            go_to_bible: "Go to Bible".into(),
+            search_placeholder: "Search... (Ctrl+F)".into(),
+            temporary_label: "Temporary".into(),
+            themes_label: "Themes".into(),
+            display_settings: "Display Settings".into(),
+            save_theme_for_song: "Save Theme for Song".into(),
+        },
     }
 }

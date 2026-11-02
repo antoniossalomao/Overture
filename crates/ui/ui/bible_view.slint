@@ -1,0 +1,634 @@
+// Holyrics-inspired 66-Book Color-Coded Bible Studio modernized with shadcn/ui
+import { ShadTheme } from "theme.slint";
+import { LucideIcon } from "icons.slint";
+import { ShadButton, ShadIconButton, ShadInput, ShadBadge, ShadScrollArea } from "components.slint";
+
+export struct UiBibleBookTile {
+    book-order: int,
+    abbr: string,
+    name: string,
+    category: int,
+    active: bool,
+}
+
+export struct UiNumberGridRow {
+    cells: [int],
+}
+
+export struct UiBibleBookGridRow {
+    tiles: [UiBibleBookTile],
+}
+
+export struct UiBibleChapterVerse {
+    verse: int,
+    text: string,
+    book: string,
+    chapter: int,
+    is-favorite: bool,
+}
+
+export struct UiBibleSearchHit {
+    row-idx: int,
+    reference: string,
+    text: string,
+    book-order: int,
+    chapter: int,
+    verse: int,
+}
+
+export component HolyricsBibleView inherits Rectangle {
+    in property <string> current-book-chapter-label: "Gênesis: 1";
+    in property <string> license-notice: "Tradução Brasileira (1917) — Domínio Público • Uso livre em cultos.";
+    in property <[string]> version-abbrs: ["TB1917", "WEB"];
+    in property <int> active-version-idx: 0;
+
+    in property <[UiBibleBookGridRow]> book-grid-rows: [];
+    in property <[UiNumberGridRow]> chapter-grid-rows: [];
+    in property <[UiNumberGridRow]> verse-grid-rows: [];
+    in property <int> active-book-order: 1;
+    in property <int> active-chapter: 1;
+    in property <int> active-verse: 1;
+
+    in property <[UiBibleChapterVerse]> chapter-verses: [];
+    in property <[UiBibleSearchHit]> search-hits: [];
+    in property <[UiBibleSearchHit]> favorite-hits: [];
+    in property <[UiBibleSearchHit]> history-hits: [];
+    in-out property <string> search-query: "";
+    in-out property <int> right-submode: 0; // 0 = Grid, 1 = Favorites, 2 = History, 3 = Search
+
+    in property <image> live-preview-image;
+
+    callback exit-bible-mode();
+    callback select-version(int);
+    callback select-book(int);
+    callback select-chapter(int);
+    callback select-verse-and-project(int);
+    callback step-chapter(int);
+    callback favorite-active-verse();
+    callback add-active-verse-to-service();
+    callback search-edited(string);
+    callback jump-to-hit(int, int, int); // book_order, chapter, verse
+    callback open-display-settings();
+
+    background: ShadTheme.bg;
+
+    HorizontalLayout {
+        spacing: 0px;
+
+        // ==================== LEFT COLUMN: VERSE LIST + MINI MONITOR ====================
+        Rectangle {
+            width: left-col-width;
+            background: ShadTheme.panel;
+
+            VerticalLayout {
+                spacing: 0px;
+
+                // 1. Back to Worship Studio button bar
+                Rectangle {
+                    height: 38px;
+                    background: ShadTheme.bg-bar;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: center;
+                        ShadButton {
+                            width: 100%;
+                            icon: "music";
+                            label: "Ir para Louvor (Overture)";
+                            variant: "secondary";
+                            clicked => { root.exit-bible-mode(); }
+                        }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                }
+
+                // 2. Chapter Stepper (< Gênesis: 1 >)
+                Rectangle {
+                    height: 34px;
+                    background: ShadTheme.panel;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        spacing: 4px;
+                        VerticalLayout {
+                            alignment: center;
+                            ShadIconButton {
+                                icon: "chevron-left";
+                                clicked => { root.step-chapter(-1); }
+                            }
+                        }
+                        Text {
+                            horizontal-stretch: 1;
+                            text: root.current-book-chapter-label;
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: ShadTheme.fg;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            ShadIconButton {
+                                icon: "chevron-right";
+                                clicked => { root.step-chapter(1); }
+                            }
+                        }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border-subtle; }
+                }
+
+                // 3. Version Pills (like Holyrics ACF / NVT bar)
+                Rectangle {
+                    height: 30px;
+                    background: ShadTheme.bg-bar;
+                    HorizontalLayout {
+                        padding: 3px;
+                        spacing: 4px;
+                        for v-abbr[v-idx] in root.version-abbrs : Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: v-idx == root.active-version-idx ? ShadTheme.live-blue-bright : ShadTheme.border;
+                            background: v-idx == root.active-version-idx ? #0c4a6e :
+                                        (vta.has-hover ? ShadTheme.accent : ShadTheme.muted);
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 4px;
+                                alignment: center;
+                                if v-idx == root.active-version-idx : VerticalLayout {
+                                    alignment: center;
+                                    LucideIcon { name: "check"; icon-size: 11px; tint: #7dd3fc; }
+                                }
+                                Text {
+                                    text: v-abbr;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: v-idx == root.active-version-idx ? #ffffff : ShadTheme.fg-muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            vta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.select-version(v-idx); }
+                            }
+                        }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                }
+
+                // 4. Scrollable Chapter Verses List
+                ShadScrollArea {
+                    vertical-stretch: 1;
+                    content-height: verses-vbox.preferred-height + 8px;
+
+                    verses-vbox := VerticalLayout {
+                        width: parent.width;
+                        spacing: 0px;
+                        for cv in root.chapter-verses : Rectangle {
+                            min-height: v-txt.preferred-height + 12px;
+                            background: cv.verse == root.active-verse ? ShadTheme.live-row-bg :
+                                        (cvta.has-hover ? ShadTheme.muted-hover : transparent);
+
+                            if cv.verse == root.active-verse : Rectangle {
+                                x: 0px; y: 0px; width: 3px; height: 100%;
+                                background: ShadTheme.live-blue-bright;
+                            }
+
+                            v-txt := Text {
+                                x: 10px;
+                                y: 6px;
+                                width: parent.width - 20px;
+                                text: cv.verse + " - " + cv.text;
+                                font-size: 12px;
+                                font-weight: cv.verse == root.active-verse ? 600 : 400;
+                                color: cv.verse == root.active-verse ? #ffffff : ShadTheme.fg-secondary;
+                                wrap: word-wrap;
+                            }
+
+                            Rectangle {
+                                y: parent.height - 1px;
+                                width: 100%;
+                                height: 1px;
+                                background: ShadTheme.border-subtle;
+                            }
+
+                            cvta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.select-verse-and-project(cv.verse); }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Public-Domain / License Attribution Card
+                Rectangle {
+                    height: 44px;
+                    background: ShadTheme.bg;
+                    Rectangle { y: 0px; height: 1px; background: ShadTheme.border; }
+                    Text {
+                        x: 8px; y: 6px;
+                        width: parent.width - 16px;
+                        height: parent.height - 12px;
+                        text: root.license-notice;
+                        font-size: 10px;
+                        color: ShadTheme.fg-subtle;
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // 6. Bottom Mini Live Preview + Quick Actions (Screenshot 2 bottom-left)
+                Rectangle {
+                    height: 82px;
+                    background: ShadTheme.bg-bar;
+                    Rectangle { y: 0px; height: 1px; background: ShadTheme.border; }
+
+                    HorizontalLayout {
+                        padding: 6px;
+                        spacing: 6px;
+
+                        // Action icons 2x2
+                        VerticalLayout {
+                            spacing: 4px;
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                ShadIconButton {
+                                    icon: "play";
+                                    active: true;
+                                    clicked => { root.select-verse-and-project(root.active-verse); }
+                                }
+                                ShadIconButton {
+                                    icon: "heart";
+                                    clicked => { root.favorite-active-verse(); }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 4px;
+                                ShadIconButton {
+                                    icon: "plus";
+                                    clicked => { root.add-active-verse-to-service(); }
+                                }
+                                ShadIconButton {
+                                    icon: "search";
+                                    clicked => {
+                                        root.right-submode = root.right-submode == 3 ? 0 : 3;
+                                        bible-search-box.focus-input();
+                                    }
+                                }
+                            }
+                        }
+
+                        // Mini 16:9 Live Preview
+                        Rectangle {
+                            width: 120px;
+                            height: 68px;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: ShadTheme.border-strong;
+                            background: #000000;
+                            clip: true;
+
+                            Image {
+                                width: 100%;
+                                height: 100%;
+                                image-fit: contain;
+                                source: root.live-preview-image;
+                            }
+                        }
+
+                        // Quick Display Settings button
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 4px;
+                            alignment: center;
+                            ShadBadge {
+                                text: root.active-book-order + ":" + root.active-chapter + ":" + root.active-verse;
+                                variant: "sky";
+                            }
+                            ShadButton {
+                                label: "Exibição";
+                                size: "xs";
+                                variant: "outline";
+                                clicked => { root.open-display-settings(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Resizable splitter
+        Rectangle {
+            width: 3px;
+            background: bsplit.has-hover || bsplit.pressed ? ShadTheme.live-blue : ShadTheme.border;
+            bsplit := TouchArea {
+                mouse-cursor: col-resize;
+                moved => {
+                    if (self.pressed) {
+                        left-col-width = clamp(left-col-width + (self.mouse-x - self.pressed-x), 240px, 480px);
+                    }
+                }
+            }
+        }
+
+        // ==================== RIGHT MAIN AREA: 66-BOOK + CHAPTER + VERSE GRIDS ====================
+        Rectangle {
+            horizontal-stretch: 1;
+            background: ShadTheme.bg;
+
+            VerticalLayout {
+                spacing: 0px;
+
+                // Top Header Bar (Favoritos | Histórico | Instant Reference/Text Search)
+                Rectangle {
+                    height: 38px;
+                    background: ShadTheme.bg-bar;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                ShadButton {
+                                    icon: "grid";
+                                    label: "Livros (66)";
+                                    size: "xs";
+                                    variant: "ghost";
+                                    active: root.right-submode == 0;
+                                    clicked => { root.right-submode = 0; }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                ShadButton {
+                                    icon: "heart";
+                                    label: "Favoritos (" + root.favorite-hits.length + ")";
+                                    size: "xs";
+                                    variant: "ghost";
+                                    active: root.right-submode == 1;
+                                    clicked => { root.right-submode = root.right-submode == 1 ? 0 : 1; }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                ShadButton {
+                                    icon: "history";
+                                    label: "Histórico (" + root.history-hits.length + ")";
+                                    size: "xs";
+                                    variant: "ghost";
+                                    active: root.right-submode == 2;
+                                    clicked => { root.right-submode = root.right-submode == 2 ? 0 : 2; }
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            bible-search-box := ShadInput {
+                                width: 320px;
+                                leading-icon: "search";
+                                placeholder: "Buscar referência (Sl 23:1) ou texto...";
+                                kbd-hint: "Enter";
+                                text <=> root.search-query;
+                                edited(q) => {
+                                    root.right-submode = q == "" ? 0 : 3;
+                                    root.search-edited(q);
+                                }
+                                accepted(q) => {
+                                    root.right-submode = q == "" ? 0 : 3;
+                                    root.search-edited(q);
+                                }
+                            }
+                        }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                }
+
+                // SUBMODE 0: HOLYRICS 66-BOOK + CHAPTERS + VERSES GRIDS
+                if root.right-submode == 0 : VerticalLayout {
+                    vertical-stretch: 1;
+                    spacing: 2px;
+                    padding: 3px;
+
+                    // 11x6 Color-Coded 66 Books Grid
+                    VerticalLayout {
+                        vertical-stretch: 54;
+                        spacing: 2px;
+                        for brow in root.book-grid-rows : HorizontalLayout {
+                            vertical-stretch: 1;
+                            spacing: 2px;
+                            for tile in brow.tiles : Rectangle {
+                                horizontal-stretch: 1;
+                                border-radius: 3px;
+                                border-width: tile.active ? 2px : 1px;
+                                border-color: ShadTheme.bible-book-border(tile.category, tile.active);
+                                background: ShadTheme.bible-book-bg(tile.category, tile.active, bta.has-hover);
+                                animate background { duration: 90ms; }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 1px;
+                                    padding: 2px;
+                                    Text {
+                                        text: tile.abbr;
+                                        font-size: 18px;
+                                        font-weight: 700;
+                                        color: #ffffff;
+                                        horizontal-alignment: center;
+                                    }
+                                    Text {
+                                        text: tile.name;
+                                        font-size: 10px;
+                                        color: #ffffffdd;
+                                        horizontal-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+
+                                bta := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.select-book(tile.book-order); }
+                                }
+                            }
+                        }
+                    }
+
+                    // Bottom 50% / 50% Split: Chapters Grid (Left) + Verses Grid (Right)
+                    HorizontalLayout {
+                        vertical-stretch: 46;
+                        spacing: 4px;
+
+                        // Chapters Grid (Warm Dark Bronze like Holyrics Screenshot 2)
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            background: #1a120b;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: #3d2814;
+
+                            ShadScrollArea {
+                                width: 100%;
+                                height: 100%;
+                                content-height: ch-vbox.preferred-height + 4px;
+
+                                ch-vbox := VerticalLayout {
+                                    width: parent.width;
+                                    padding: 2px;
+                                    spacing: 2px;
+                                    for crow in root.chapter-grid-rows : HorizontalLayout {
+                                        height: 44px;
+                                        spacing: 2px;
+                                        for ch-num in crow.cells : Rectangle {
+                                            horizontal-stretch: 1;
+                                            border-radius: 3px;
+                                            border-width: ch-num == root.active-chapter ? 2px : (ch-num > 0 ? 1px : 0px);
+                                            border-color: ch-num == root.active-chapter ? ShadTheme.live-blue-bright : #6b4726;
+                                            background: ch-num <= 0 ? transparent :
+                                                        ch-num == root.active-chapter ? #291809 :
+                                                        cta.has-hover ? #734c29 : #5c3c1e;
+
+                                            if ch-num > 0 : Text {
+                                                text: ch-num;
+                                                font-size: 18px;
+                                                font-weight: ch-num == root.active-chapter ? 700 : 500;
+                                                color: #ffffff;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+
+                                            cta := TouchArea {
+                                                enabled: ch-num > 0;
+                                                mouse-cursor: ch-num > 0 ? pointer : default;
+                                                clicked => { root.select-chapter(ch-num); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Verses Grid (Warm Sand/Ochre like Holyrics Screenshot 2)
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            background: #241910;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: #4f3720;
+
+                            ShadScrollArea {
+                                width: 100%;
+                                height: 100%;
+                                content-height: vs-vbox.preferred-height + 4px;
+
+                                vs-vbox := VerticalLayout {
+                                    width: parent.width;
+                                    padding: 2px;
+                                    spacing: 2px;
+                                    for vrow in root.verse-grid-rows : HorizontalLayout {
+                                        height: 44px;
+                                        spacing: 2px;
+                                        for vs-num in vrow.cells : Rectangle {
+                                            horizontal-stretch: 1;
+                                            border-radius: 3px;
+                                            border-width: vs-num == root.active-verse ? 2px : (vs-num > 0 ? 1px : 0px);
+                                            border-color: vs-num == root.active-verse ? ShadTheme.live-blue-bright : #ad8257;
+                                            background: vs-num <= 0 ? transparent :
+                                                        vs-num == root.active-verse ? #3b2815 :
+                                                        vsta.has-hover ? #ab7e52 : #996f45;
+
+                                            if vs-num > 0 : Text {
+                                                text: vs-num;
+                                                font-size: 18px;
+                                                font-weight: vs-num == root.active-verse ? 700 : 500;
+                                                color: #ffffff;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+
+                                            vsta := TouchArea {
+                                                enabled: vs-num > 0;
+                                                mouse-cursor: vs-num > 0 ? pointer : default;
+                                                clicked => { root.select-verse-and-project(vs-num); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // SUBMODES 1 / 2 / 3: FAVORITES, HISTORY, OR SEARCH RESULTS LIST
+                if root.right-submode != 0 : ShadScrollArea {
+                    vertical-stretch: 1;
+                    content-height: hits-vbox.preferred-height + 24px;
+
+                    hits-vbox := VerticalLayout {
+                        width: parent.width;
+                        padding: 12px;
+                        spacing: 6px;
+
+                        for hit in (root.right-submode == 1 ? root.favorite-hits :
+                                    root.right-submode == 2 ? root.history-hits : root.search-hits) : Rectangle {
+                            min-height: 54px;
+                            border-radius: ShadTheme.radius-md;
+                            border-width: 1px;
+                            border-color: hta.has-hover ? ShadTheme.live-blue-bright : ShadTheme.border;
+                            background: hta.has-hover ? ShadTheme.muted-hover : ShadTheme.card;
+
+                            HorizontalLayout {
+                                padding: 10px;
+                                spacing: 12px;
+                                VerticalLayout {
+                                    width: 130px;
+                                    alignment: center;
+                                    ShadBadge { text: hit.reference; variant: "sky"; }
+                                }
+                                Text {
+                                    horizontal-stretch: 1;
+                                    text: hit.text;
+                                    font-size: 12.5px;
+                                    color: ShadTheme.fg;
+                                    wrap: word-wrap;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            hta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.right-submode = 0;
+                                    root.jump-to-hit(hit.book-order, hit.chapter, hit.verse);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Footer Hint Bar (like Holyrics Screenshot 2)
+                Rectangle {
+                    height: 22px;
+                    background: ShadTheme.bg-bar;
+                    Rectangle { y: 0px; height: 1px; background: ShadTheme.border; }
+                    Text {
+                        width: 100%;
+                        height: 100%;
+                        text: "Clique no Livro → Capítulo → Versículo para projetar ao vivo • Use ← / → para avançar versículos";
+                        font-size: 10.5px;
+                        color: ShadTheme.fg-subtle;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+
+    property <length> left-col-width: 320px;
+}
