@@ -153,8 +153,8 @@ impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
             font_family: "Segoe UI".to_string(),
-            font_size: 64.0,
-            line_height_scale: 1.32,
+            font_size: 80.0,
+            line_height_scale: 1.30,
             bold: true,
             text_color: RgbaColor::WHITE,
             footer_color: RgbaColor::new(251, 191, 36, 255),
@@ -172,7 +172,7 @@ impl ThemeConfig {
     pub fn scripture_preset() -> Self {
         Self {
             font_family: "Georgia".to_string(),
-            font_size: 54.0,
+            font_size: 62.0,
             line_height_scale: 1.35,
             bold: false,
             text_color: RgbaColor::new(248, 250, 252, 255),
@@ -534,22 +534,62 @@ pub struct MonitorAssignment {
     pub stage_enabled: bool,
     pub return_enabled: bool,
     pub return_theme_id: Option<i64>,
+    #[serde(default)]
+    pub windowed_mode: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CountdownState {
     pub active: bool,
     pub label: String,
+    #[serde(default)]
+    pub text_before: String,
+    #[serde(default)]
+    pub text_after: String,
+    #[serde(default = "default_true")]
+    pub pad_zero: bool,
+    #[serde(default)]
+    pub hide_zero_min: bool,
     pub remaining_secs: u64,
     pub total_secs: u64,
     pub show_on_main: bool,
+}
+
+impl Default for CountdownState {
+    fn default() -> Self {
+        Self {
+            active: false,
+            label: String::new(),
+            text_before: String::new(),
+            text_after: String::new(),
+            pad_zero: true,
+            hide_zero_min: false,
+            remaining_secs: 0,
+            total_secs: 0,
+            show_on_main: false,
+        }
+    }
 }
 
 impl CountdownState {
     pub fn formatted_mm_ss(&self) -> String {
         let mins = self.remaining_secs / 60;
         let secs = self.remaining_secs % 60;
-        format!("{:02}:{:02}", mins, secs)
+        if self.hide_zero_min && mins == 0 {
+            if self.pad_zero {
+                format!("{:02}", secs)
+            } else {
+                format!("{}", secs)
+            }
+        } else if self.pad_zero {
+            format!("{:02}:{:02}", mins, secs)
+        } else {
+            format!("{}:{:02}", mins, secs)
+        }
     }
 }
 

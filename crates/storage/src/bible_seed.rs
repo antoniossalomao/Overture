@@ -335,85 +335,299 @@ pub fn builtin_public_domain_bibles() -> Vec<(BibleVersion, Vec<BibleVerse>)> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedBibleRef {
+    pub book_order: Option<i32>,
     pub book_query: String,
-    pub chapter: i32,
+    pub chapter: Option<i32>,
     pub verse_start: Option<i32>,
     pub verse_end: Option<i32>,
 }
 
+/// Parses flexible Holyrics-style Bible references in Portuguese and English:
+/// - Space, colon, dot, or comma separated: `"jo 3 16"`, `"João 3:16"`, `"gn 1.1"`, `"rm 8,28"`
+/// - Glued references: `"gn1:1"`, `"jo3.16"`, `"1sm 17 45"`, `"1sm17:45"`, `"1 co 13 4-7"`, `"ii co 5 17"`
+/// - Book + chapter only: `"sl 23"`, `"jo 3"`, `"jo 3:"`
+/// - Book name or abbreviation only: `"gn"`, `"salmos"`, `"1co"`, `"jó"`, `"jo"`
 pub fn parse_bible_reference(query: &str) -> Option<ParsedBibleRef> {
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return None;
     }
 
-    let last_space = trimmed.rfind(' ')?;
-    let raw_book = trimmed[..last_space].trim();
-    let numbers_part = trimmed[last_space + 1..].trim();
-    if raw_book.is_empty() || numbers_part.is_empty() {
-        return None;
-    }
+    let (raw_book, numbers_tail) = split_book_and_numbers(trimmed)?;
+    let book_info = resolve_canonical_book(&raw_book)?;
 
-    let (chap_str, verse_part) = match numbers_part.split_once(':') {
-        Some((c, v)) => (c.trim(), Some(v.trim())),
-        None => (numbers_part, None),
-    };
-    let chapter: i32 = chap_str.parse().ok()?;
-    if chapter <= 0 {
-        return None;
-    }
+    let (chapter, verse_start, verse_end) = parse_chapter_and_verses(numbers_tail)?;
 
-    let (verse_start, verse_end) = match verse_part {
-        None => (None, None),
-        Some(vp) => {
-            if let Some((s, e)) = vp.split_once('-') {
-                let vs: i32 = s.trim().parse().ok()?;
-                let ve: i32 = e.trim().parse().ok()?;
-                (Some(vs), Some(ve.max(vs)))
-            } else {
-                let vs: i32 = vp.parse().ok()?;
-                (Some(vs), Some(vs))
-            }
-        }
-    };
-
-    let expanded_book = expand_book_alias(raw_book);
     Some(ParsedBibleRef {
-        book_query: expanded_book,
+        book_order: Some(book_info.order),
+        book_query: crate::accent::fold_search_text(book_info.name_pt),
         chapter,
         verse_start,
         verse_end,
     })
 }
 
-fn expand_book_alias(alias: &str) -> String {
-    let folded = crate::accent::fold_search_text(alias);
+fn split_book_and_numbers(s: &str) -> Option<(String, &str)> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let mut prefix_digit: Option<char> = None;
+    let mut after_prefix = trimmed;
+
+    // 1. Check Roman numeral prefix ("I ", "II ", "III ") before a book name
+    let lower = trimmed.to_lowercase();
+    for (roman, digit) in [("iii ", '3'), ("ii ", '2'), ("i ", '1')] {
+        if lower.starts_with(roman) {
+            let candidate = trimmed[roman.len()..].trim_start();
+            if candidate.chars().next().is_some_and(|c| c.is_alphabetic()) {
+                prefix_digit = Some(digit);
+                after_prefix = candidate;
+                break;
+            }
+        }
+    }
+
+    // 2. Check numeric ordinal prefix ("1 ", "1Sm", "1º Sm", "2ª Co", "3Jo")
+    if prefix_digit.is_none() {
+        let mut chars = trimmed.char_indices();
+        if let Some((_, first @ ('1' | '2' | '3'))) = chars.next() {
+            let mut idx_after = first.len_utf8();
+            let tail = &trimmed[idx_after..];
+            let mut tchars = tail.char_indices();
+            if let Some((_, c)) = tchars.next()
+                && matches!(c, 'º' | 'ª' | '.')
+            {
+                idx_after += c.len_utf8();
+            }
+            let candidate = trimmed[idx_after..].trim_start();
+            if candidate.chars().next().is_some_and(|c| c.is_alphabetic()) {
+                prefix_digit = Some(first);
+                after_prefix = candidate;
+            }
+        }
+    }
+
+    // 3. Consume alphabetic characters, spaces, dots, and hyphens until the first ASCII digit (chapter)
+    let mut split_byte = after_prefix.len();
+    for (byte_idx, ch) in after_prefix.char_indices() {
+        if ch.is_ascii_digit() {
+            split_byte = byte_idx;
+            break;
+        }
+    }
+
+    let book_letters = after_prefix[..split_byte]
+        .trim()
+        .trim_end_matches(['.', ':', ',', ';', '-'])
+        .trim();
+    if book_letters.is_empty() {
+        return None;
+    }
+
+    let raw_book = match prefix_digit {
+        Some(d) => format!("{d} {book_letters}"),
+        None => book_letters.to_string(),
+    };
+    let numbers_tail = after_prefix[split_byte..].trim();
+    Some((raw_book, numbers_tail))
+}
+
+fn parse_chapter_and_verses(tail: &str) -> Option<(Option<i32>, Option<i32>, Option<i32>)> {
+    let t = tail.trim();
+    if t.is_empty() {
+        return Some((None, None, None));
+    }
+
+    // Normalize " a " range (e.g. "jo 3 16 a 18") into "-"
+    let normalized = t
+        .replace(" a ", "-")
+        .replace(" A ", "-")
+        .replace(" - ", "-")
+        .replace(" -", "-")
+        .replace("- ", "-");
+
+    // Split chapter and optional verse part by ':', '.', ',', or whitespace
+    let mut chap_end = normalized.len();
+    let mut sep_len = 0usize;
+    for (idx, ch) in normalized.char_indices() {
+        if matches!(ch, ':' | '.' | ',' | ';') || ch.is_whitespace() {
+            chap_end = idx;
+            sep_len = ch.len_utf8();
+            break;
+        }
+    }
+
+    let chap_str = normalized[..chap_end].trim();
+    let chapter: i32 = chap_str.parse().ok()?;
+    if chapter <= 0 {
+        return None;
+    }
+
+    if sep_len == 0 {
+        return Some((Some(chapter), None, None));
+    }
+
+    let verse_raw = normalized[chap_end + sep_len..]
+        .trim()
+        .trim_start_matches([':', '.', ',', ';'])
+        .trim();
+
+    // Operator may still be mid-typing ("jo 3:" or "jo 3 ")
+    if verse_raw.is_empty() {
+        return Some((Some(chapter), None, None));
+    }
+
+    if let Some((start_s, end_s)) = verse_raw.split_once('-') {
+        let vs: i32 = start_s.trim().parse().ok()?;
+        if vs <= 0 {
+            return None;
+        }
+        let end_trim = end_s.trim();
+        if end_trim.is_empty() {
+            // Operator mid-typing "jo 3:16-"
+            return Some((Some(chapter), Some(vs), Some(vs)));
+        }
+        let ve: i32 = end_trim.parse().ok()?;
+        if ve <= 0 {
+            return None;
+        }
+        Some((Some(chapter), Some(vs), Some(ve.max(vs))))
+    } else {
+        let vs: i32 = verse_raw.parse().ok()?;
+        if vs <= 0 {
+            return None;
+        }
+        Some((Some(chapter), Some(vs), Some(vs)))
+    }
+}
+
+/// Resolves a Portuguese or English book name/abbreviation to its canonical 1..=66 entry.
+pub fn resolve_canonical_book(alias: &str) -> Option<&'static CanonicalBookInfo> {
+    let clean = alias.trim().trim_end_matches('.').trim();
+    if clean.is_empty() {
+        return None;
+    }
+
+    // 1. Disambiguate accented "Jó" / "Job" (Book 18) vs unaccented "Jo" / "João" (Book 43)
+    let raw_lower = clean.to_lowercase();
+    if raw_lower == "jó" || raw_lower == "livro de jó" || raw_lower == "job" {
+        return canonical_book_by_order(18);
+    }
+
+    let folded = crate::accent::fold_search_text(clean);
     let compact = folded.replace(' ', "");
+    if compact.is_empty() {
+        return None;
+    }
+
+    if matches!(
+        compact.as_str(),
+        "jo" | "joao" | "saojoao" | "evangelhodejoao" | "jhn" | "john"
+    ) {
+        return canonical_book_by_order(43);
+    }
+
+    // 2. Exact match on canonical PT/EN abbreviations or full names
     for b in &CANONICAL_BIBLE_BOOKS {
-        if crate::accent::fold_search_text(b.abbr_pt) == compact
-            || crate::accent::fold_search_text(b.abbr_en) == compact
+        if b.order == 18 && compact == "jo" {
+            continue;
+        }
+        if crate::accent::fold_search_text(b.abbr_pt).replace(' ', "") == compact
+            || crate::accent::fold_search_text(b.abbr_en).replace(' ', "") == compact
             || crate::accent::fold_search_text(b.name_pt).replace(' ', "") == compact
             || crate::accent::fold_search_text(b.name_en).replace(' ', "") == compact
         {
-            // Keep English query if user explicitly typed an English-only book name like "john"
-            if folded == "john" || folded == "jhn" {
-                return "john".to_string();
-            }
-            return crate::accent::fold_search_text(b.name_pt);
+            return Some(b);
         }
     }
-    match folded.as_str() {
-        "sal" | "salmo" | "ps" | "psa" => "salmos".to_string(),
-        "prov" => "proverbios".to_string(),
-        "isa" => "isaias".to_string(),
-        "mat" => "mateus".to_string(),
-        "mar" => "marcos".to_string(),
-        "luc" => "lucas".to_string(),
-        "jn" => "john".to_string(),
-        "rom" => "romanos".to_string(),
-        "fil" | "flp" => "filipenses".to_string(),
-        "heb" => "hebreus".to_string(),
-        "apo" | "apoc" | "rev" => "apocalipse".to_string(),
-        other => other.to_string(),
+
+    // 3. Common worship operator abbreviations (PT-BR & EN)
+    let order = match compact.as_str() {
+        "gen" | "gn" => 1,
+        "exo" | "exod" => 2,
+        "lev" => 3,
+        "num" => 4,
+        "deu" | "deut" => 5,
+        "jos" => 6,
+        "jui" | "juiz" => 7,
+        "rut" => 8,
+        "1sam" | "1s" => 9,
+        "2sam" | "2s" => 10,
+        "1rei" | "1reis" | "1r" => 11,
+        "2rei" | "2reis" | "2r" => 12,
+        "1cro" | "1cron" => 13,
+        "2cro" | "2cron" => 14,
+        "esd" => 15,
+        "nee" | "neem" => 16,
+        "est" => 17,
+        "sal" | "salmo" | "slm" | "ps" | "psa" | "psalm" => 19,
+        "pro" | "prov" | "prv" => 20,
+        "ecl" | "ecle" => 21,
+        "can" | "cant" | "canticos" | "canticodesalomao" | "cantaresdesalomao" => 22,
+        "isa" => 23,
+        "jer" => 24,
+        "lam" => 25,
+        "eze" | "ezeq" => 26,
+        "dan" => 27,
+        "ose" => 28,
+        "joe" => 29,
+        "amo" => 30,
+        "oba" | "obad" => 31,
+        "jon" | "jn" => 32,
+        "miq" => 33,
+        "nau" => 34,
+        "hab" => 35,
+        "sof" => 36,
+        "age" => 37,
+        "zac" => 38,
+        "mal" => 39,
+        "mat" => 40,
+        "mar" | "marc" => 41,
+        "luc" => 42,
+        "ato" | "atosdosapostolos" => 44,
+        "rom" => 45,
+        "1cor" | "1c" => 46,
+        "2cor" | "2c" => 47,
+        "gal" => 48,
+        "efe" | "efes" => 49,
+        "fil" | "flp" | "filip" => 50,
+        "col" => 51,
+        "1tes" | "1tess" => 52,
+        "2tes" | "2tess" => 53,
+        "1tim" => 54,
+        "2tim" => 55,
+        "tit" => 56,
+        "flm" | "file" | "filem" | "filemon" => 57,
+        "heb" => 58,
+        "tia" | "tiag" => 59,
+        "1ped" | "1pd" | "1p" => 60,
+        "2ped" | "2pd" | "2p" => 61,
+        "1joao" | "1jn" | "1j" => 62,
+        "2joao" | "2jn" | "2j" => 63,
+        "3joao" | "3jn" | "3j" => 64,
+        "jud" => 65,
+        "apo" | "apoc" | "rev" => 66,
+        _ => 0,
+    };
+    if order > 0 {
+        return canonical_book_by_order(order);
     }
+
+    // 4. Unambiguous 4+ char prefix match on book names (e.g. "genes", "deuter", "apocal")
+    if compact.len() >= 4 {
+        let mut matches = CANONICAL_BIBLE_BOOKS.iter().filter(|b| {
+            let pt = crate::accent::fold_search_text(b.name_pt).replace(' ', "");
+            let en = crate::accent::fold_search_text(b.name_en).replace(' ', "");
+            pt.starts_with(&compact) || en.starts_with(&compact)
+        });
+        if let Some(first) = matches.next()
+            && matches.next().is_none()
+        {
+            return Some(first);
+        }
+    }
+
+    None
 }

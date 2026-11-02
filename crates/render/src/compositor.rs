@@ -2,8 +2,8 @@ use chrono::Local;
 use cosmic_text::{Align, Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, SwashCache, Weight};
 use image::RgbaImage;
 use overture_core::{
-    BackgroundSpec, DisplayMode, HorizontalAlign, OutputRole, OutputState, RgbaColor,
-    ServiceItemKind, ShadowSpec, ThemeConfig, VerticalAlign,
+    BackgroundSpec, CountdownState, DisplayMode, HorizontalAlign, OutputRole, OutputState,
+    RgbaColor, ServiceItemKind, ShadowSpec, ThemeConfig, VerticalAlign,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -305,6 +305,21 @@ impl SlideCompositor {
         frame
     }
 
+    pub fn compose_countdown_preview(
+        &mut self,
+        theme: &ThemeConfig,
+        countdown: &CountdownState,
+        width: u32,
+        height: u32,
+        video_frame: Option<VideoFrameView<'_>>,
+    ) -> RgbaFrame {
+        let mut frame = RgbaFrame::new(width, height, RgbaColor::BLACK);
+        self.draw_background(&mut frame, &theme.background, video_frame);
+        let scale = height as f32 / 1080.0;
+        self.draw_fullscreen_countdown(&mut frame, countdown, theme, scale);
+        frame
+    }
+
     fn compose_projector(
         &mut self,
         state: &OutputState,
@@ -449,7 +464,21 @@ impl SlideCompositor {
 
         // Countdown overlay on main/return when enabled
         if state.countdown.show_on_main && (state.countdown.active || state.countdown.remaining_secs > 0) {
-            self.draw_countdown_overlay(&mut frame, state, &theme.font_family, scale);
+            let has_slide_text = state.display_mode != DisplayMode::ClearText
+                && state
+                    .current_slide()
+                    .map(|s| !s.text.trim().is_empty())
+                    .unwrap_or(false)
+                && state
+                    .current_item
+                    .as_ref()
+                    .map(|i| i.kind != ServiceItemKind::Countdown)
+                    .unwrap_or(false);
+            if has_slide_text {
+                self.draw_countdown_overlay(&mut frame, state, &theme.font_family, scale);
+            } else {
+                self.draw_fullscreen_countdown(&mut frame, &state.countdown, theme, scale);
+            }
         }
 
         // Manual Scoreboard overlay
@@ -735,6 +764,108 @@ impl SlideCompositor {
                     );
                 }
             }
+        }
+    }
+
+    fn draw_fullscreen_countdown(
+        &mut self,
+        frame: &mut RgbaFrame,
+        cd: &CountdownState,
+        theme: &ThemeConfig,
+        scale: f32,
+    ) {
+        let clock_str = cd.formatted_mm_ss();
+        let before = cd.text_before.trim();
+        let after = if !cd.text_after.trim().is_empty() {
+            cd.text_after.trim()
+        } else {
+            cd.label.trim()
+        };
+
+        let margin_x = ((frame.width as f32) * 0.06).round() as i32;
+        let box_w = frame.width.saturating_sub((margin_x as u32) * 2).max(32);
+        let shadow = ShadowSpec {
+            enabled: true,
+            color: RgbaColor::new(0, 0, 0, 220),
+            offset_x: (4.0 * scale).max(1.0),
+            offset_y: (4.0 * scale).max(1.0),
+        };
+
+        let clock_px = (188.0 * scale).max(24.0);
+        let clock_box_h = (clock_px * 1.25).round() as u32;
+        let center_y = (frame.height as i32 / 2) - (clock_box_h as i32 / 2)
+            - if !after.is_empty() {
+                (38.0 * scale).round() as i32
+            } else {
+                0
+            };
+
+        if !before.is_empty() {
+            let sub_px = (58.0 * scale).max(12.0);
+            let sub_h = (sub_px * 2.2).round() as u32;
+            let by = (center_y - sub_h as i32 - (12.0 * scale).round() as i32).max(8);
+            self.draw_text_block(
+                frame,
+                TextBlockSpec {
+                    text: before,
+                    font_family: &theme.font_family,
+                    font_size_px: sub_px,
+                    line_height_px: sub_px * 1.22,
+                    bold: true,
+                    color: theme.text_color,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Bottom,
+                    shadow,
+                    box_x: margin_x,
+                    box_y: by,
+                    box_w,
+                    box_h: sub_h,
+                },
+            );
+        }
+
+        self.draw_text_block(
+            frame,
+            TextBlockSpec {
+                text: &clock_str,
+                font_family: &theme.font_family,
+                font_size_px: clock_px,
+                line_height_px: clock_px * 1.12,
+                bold: true,
+                color: theme.text_color,
+                h_align: HorizontalAlign::Center,
+                v_align: VerticalAlign::Middle,
+                shadow,
+                box_x: margin_x,
+                box_y: center_y.max(0),
+                box_w,
+                box_h: clock_box_h,
+            },
+        );
+
+        if !after.is_empty() {
+            let after_px = (68.0 * scale).max(13.0);
+            let after_h = (after_px * 2.4).round() as u32;
+            let ay = (center_y + clock_box_h as i32 + (14.0 * scale).round() as i32)
+                .min(frame.height as i32 - 16);
+            self.draw_text_block(
+                frame,
+                TextBlockSpec {
+                    text: after,
+                    font_family: &theme.font_family,
+                    font_size_px: after_px,
+                    line_height_px: after_px * 1.24,
+                    bold: true,
+                    color: theme.text_color,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Top,
+                    shadow,
+                    box_x: margin_x,
+                    box_y: ay.max(0),
+                    box_w,
+                    box_h: after_h,
+                },
+            );
         }
     }
 

@@ -10,6 +10,7 @@ pub use backup::{BackupManifest, create_full_backup, restore_full_backup};
 pub use bible_seed::{
     CANONICAL_BIBLE_BOOKS, CanonicalBookInfo, ParsedBibleRef, builtin_public_domain_bibles,
     canonical_book_by_order, default_studio_themes, load_full_tb1917_verses, parse_bible_reference,
+    resolve_canonical_book,
 };
 
 use anyhow::{Context, Result};
@@ -941,34 +942,33 @@ impl Storage {
         }
 
         if let Some(parsed) = parse_bible_reference(trimmed) {
-            let rows = sqlx::query(
-                r#"SELECT version_id, book, book_order, chapter, verse, text
-                   FROM bible_verses
-                   WHERE version_id = ?
-                     AND chapter = ?
-                     AND (? IS NULL OR verse >= ?)
-                     AND (? IS NULL OR verse <= ?)
-                   ORDER BY book_order ASC, verse ASC"#,
-            )
-            .bind(version_id)
-            .bind(parsed.chapter)
-            .bind(parsed.verse_start)
-            .bind(parsed.verse_start)
-            .bind(parsed.verse_end)
-            .bind(parsed.verse_end)
-            .fetch_all(&self.pool)
-            .await?;
+            if let Some(order) = parsed.book_order {
+                let target_chapter = parsed.chapter.unwrap_or(1);
+                let rows = sqlx::query(
+                    r#"SELECT version_id, book, book_order, chapter, verse, text
+                       FROM bible_verses
+                       WHERE version_id = ?
+                         AND book_order = ?
+                         AND chapter = ?
+                         AND (? IS NULL OR verse >= ?)
+                         AND (? IS NULL OR verse <= ?)
+                       ORDER BY verse ASC
+                       LIMIT ?"#,
+                )
+                .bind(version_id)
+                .bind(order)
+                .bind(target_chapter)
+                .bind(parsed.verse_start)
+                .bind(parsed.verse_start)
+                .bind(parsed.verse_end)
+                .bind(parsed.verse_end)
+                .bind(limit)
+                .fetch_all(&self.pool)
+                .await?;
 
-            let book_fold = fold_search_text(&parsed.book_query);
-            let matched: Vec<BibleVerse> = rows
-                .into_iter()
-                .map(row_to_bible_verse)
-                .filter(|v| fold_search_text(&v.book).starts_with(&book_fold))
-                .take(limit as usize)
-                .collect();
-
-            if !matched.is_empty() {
-                return Ok(matched);
+                if !rows.is_empty() {
+                    return Ok(rows.into_iter().map(row_to_bible_verse).collect());
+                }
             }
         }
 
@@ -1411,7 +1411,45 @@ mod tests {
         // Seeded Bible reference & text search (complete 66-book TB1917: "Pois assim amou Deus ao mundo...")
         let jo316 = store.search_bible(1, "João 3:16", 10).await?;
         assert_eq!(jo316.len(), 1);
+        assert_eq!(jo316[0].book_order, 43);
         assert!(jo316[0].text.contains("amou") && jo316[0].text.contains("mundo"));
+
+        // Space-separated, dot-separated, glued, and numbered-book references MUST all work!
+        let jo_space = store.search_bible(1, "jo 3 16", 10).await?;
+        assert_eq!(jo_space.len(), 1);
+        assert_eq!(jo_space[0].book_order, 43);
+        assert_eq!(jo_space[0].chapter, 3);
+        assert_eq!(jo_space[0].verse, 16);
+
+        let jo_glued = store.search_bible(1, "jo3.16", 10).await?;
+        assert_eq!(jo_glued.len(), 1);
+        assert_eq!(jo_glued[0].book_order, 43);
+
+        // Disambiguate accented "Jó" (Book 18) vs "Jo" (Book 43)
+        let job1 = store.search_bible(1, "jó 1 1", 10).await?;
+        assert_eq!(job1.len(), 1);
+        assert_eq!(job1[0].book_order, 18);
+
+        // Numbered books with and without spaces
+        let sm17 = store.search_bible(1, "1 sm 17 45", 10).await?;
+        assert_eq!(sm17.len(), 1);
+        assert_eq!(sm17[0].book_order, 9);
+        assert_eq!(sm17[0].chapter, 17);
+        assert_eq!(sm17[0].verse, 45);
+
+        let co13 = store.search_bible(1, "1co 13 4-7", 10).await?;
+        assert_eq!(co13.len(), 4);
+        assert_eq!(co13[0].book_order, 46);
+
+        // Book-only & chapter-only queries
+        let gn_only = store.search_bible(1, "gn", 50).await?;
+        assert_eq!(gn_only.len(), 31);
+        assert_eq!(gn_only[0].book_order, 1);
+        assert_eq!(gn_only[0].chapter, 1);
+
+        let sl23_chap = store.search_bible(1, "sl 23", 20).await?;
+        assert_eq!(sl23_chap.len(), 6);
+        assert_eq!(sl23_chap[0].book_order, 19);
 
         let gen1 = store.list_bible_chapter_verses(1, 1, 1).await?;
         assert_eq!(gen1.len(), 31);

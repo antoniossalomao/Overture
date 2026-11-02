@@ -188,7 +188,18 @@ pub enum CoreCommand {
         seconds: u64,
         show_on_main: bool,
     },
+    StartStudioCountdown {
+        seconds: u64,
+        text_before: String,
+        text_after: String,
+        pad_zero: bool,
+        hide_zero_min: bool,
+        show_on_main: bool,
+    },
     StopCountdown,
+    UpdateCurrentItemNotes {
+        notes: String,
+    },
     UpdateScoreboard {
         scoreboard: ScoreboardState,
     },
@@ -398,15 +409,55 @@ impl StateEngine {
                 } => {
                     st.countdown = CountdownState {
                         active: seconds > 0,
+                        text_after: label.clone(),
                         label,
+                        text_before: String::new(),
+                        pad_zero: true,
+                        hide_zero_min: false,
                         remaining_secs: seconds,
                         total_secs: seconds,
                         show_on_main,
                     };
                 }
+                CoreCommand::StartStudioCountdown {
+                    seconds,
+                    text_before,
+                    text_after,
+                    pad_zero,
+                    hide_zero_min,
+                    show_on_main,
+                } => {
+                    let combined_label = match (text_before.trim(), text_after.trim()) {
+                        ("", "") => String::new(),
+                        (b, "") => b.to_string(),
+                        ("", a) => a.to_string(),
+                        (b, a) => format!("{b} — {a}"),
+                    };
+                    st.countdown = CountdownState {
+                        active: seconds > 0,
+                        label: combined_label,
+                        text_before,
+                        text_after,
+                        pad_zero,
+                        hide_zero_min,
+                        remaining_secs: seconds,
+                        total_secs: seconds,
+                        show_on_main,
+                    };
+                    if show_on_main {
+                        st.display_mode = DisplayMode::Normal;
+                    }
+                }
                 CoreCommand::StopCountdown => {
                     st.countdown.active = false;
                     st.countdown.show_on_main = false;
+                }
+                CoreCommand::UpdateCurrentItemNotes { notes } => {
+                    if let Some(item) = &mut st.current_item {
+                        item.notes = notes;
+                    } else {
+                        changed = false;
+                    }
                 }
                 CoreCommand::UpdateScoreboard { scoreboard } => {
                     st.scoreboard = scoreboard;

@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "GPL-3.0-or-later"
 authors = ["Antonio Salomão <antonio.assuino.salomao@gmail.com>"]
@@ -65,7 +65,7 @@ libloading = "0.8"
 axum = { version = "0.8", features = ["ws", "macros"] }
 tower-http = { version = "0.6", features = ["cors"] }
 futures-util = "0.3"
-slint = "1.9"
+slint = { version = "1.9", features = ["renderer-skia", "renderer-software"] }
 slint-build = "1.9"
 winresource = "0.1"
 directories = "6.0"
