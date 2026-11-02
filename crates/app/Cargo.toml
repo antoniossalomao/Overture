@@ -33,3 +33,11 @@ windows-sys.workspace = true
 
 [build-dependencies]
 winresource.workspace = true
+
+[package.metadata.wix]
+upgrade-guid = "9F4E8A71-3D2C-4B85-A619-7C80E5D12F01"
+path-guid = "E5A1331E-B7F8-40D4-88AB-5D83D3CD7039"
+license = false
+eula = false
+wxs = ["wix/main.wxs"]
+

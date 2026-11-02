@@ -1,0 +1,163 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+    <Product
+        Id='*'
+        Name='Overture'
+        UpgradeCode='9F4E8A71-3D2C-4B85-A619-7C80E5D12F01'
+        Manufacturer='Overture Project'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package
+            Id='*'
+            Keywords='Installer,Overture,Projection,Worship'
+            Description='Overture - Worship Projection Desktop Application'
+            Manufacturer='Overture Project'
+            InstallerVersion='500'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perMachine'
+            SummaryCodepage='1252'/>
+
+        <!-- Seamless in-place version upgrade without manual uninstallation -->
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='overture.cab' EmbedCab='yes' DiskPrompt='Overture Media'/>
+        <Property Id='DiskPrompt' Value='Overture Installation'/>
+
+        <!-- Multi-resolution .ico (16, 32, 48, 64, 128, 256 px) for Settings > Installed Apps & Shortcuts -->
+        <Icon Id='ProductICO' SourceFile='$(sys.SOURCEFILEDIR)..\..\..\assets\overture.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='ProductICO'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/antoniossalomao/Overture'/>
+        <Property Id='ARPURLINFOABOUT' Value='https://github.com/antoniossalomao/Overture'/>
+        <Property Id='ARPCOMMENTS' Value='Overture Worship Projection Application'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+                <Directory Id='APPLICATIONFOLDER' Name='Overture'>
+
+                    <Component Id='MainExecutable' Guid='3A7C9D14-58E2-4B09-8C61-2D4F7E90A1B3'>
+                        <File
+                            Id='overture_exe'
+                            Name='overture.exe'
+                            DiskId='1'
+                            Source='$(var.CargoTargetBinDir)\overture.exe'
+                            KeyPath='yes'/>
+                    </Component>
+
+                    <Component Id='WgpuD3dCompilerRuntime' Guid='6C1F48B2-90D3-47A5-BE12-54A8C3D9E024'>
+                        <File
+                            Id='d3dcompiler_dll'
+                            Name='d3dcompiler_47.dll'
+                            DiskId='1'
+                            Source='$(sys.SOURCEFILEDIR)..\..\..\redist\d3dcompiler_47.dll'
+                            KeyPath='yes'/>
+                    </Component>
+
+                    <Component Id='LicenseDocument' Guid='8E2B57C9-14A6-4F38-9D05-71C4B8E2F635'>
+                        <File
+                            Id='LicenseRtfFile'
+                            Name='LICENSE.rtf'
+                            DiskId='1'
+                            Source='$(sys.SOURCEFILEDIR)..\..\..\LICENSE.rtf'
+                            KeyPath='yes'/>
+                    </Component>
+
+                    <Directory Id='RedistFolder' Name='redist'>
+                        <Component Id='LibmpvRuntime' Guid='4D9A62E1-73B8-4C50-8A19-92E5D7F1C846'>
+                            <File
+                                Id='libmpv_dll'
+                                Name='libmpv-2.dll'
+                                DiskId='1'
+                                Source='$(sys.SOURCEFILEDIR)..\..\..\redist\libmpv-2.dll'
+                                KeyPath='yes'/>
+                        </Component>
+                        <Component Id='MpvDefaultConfig' Guid='2F5C83A7-41E9-48B6-9C24-13A6E8B4D957'>
+                            <File
+                                Id='mpv_conf'
+                                Name='mpv.conf'
+                                DiskId='1'
+                                Source='$(sys.SOURCEFILEDIR)..\..\..\redist\mpv.conf'
+                                KeyPath='yes'/>
+                        </Component>
+                    </Directory>
+
+                    <Directory Id='AssetsFolder' Name='assets'>
+                        <Component Id='AppIconAsset' Guid='5B8D14F3-29C7-4E61-AD38-64B7F9C2E168'>
+                            <File
+                                Id='overture_ico'
+                                Name='overture.ico'
+                                DiskId='1'
+                                Source='$(sys.SOURCEFILEDIR)..\..\..\assets\overture.ico'
+                                KeyPath='yes'/>
+                        </Component>
+                    </Directory>
+
+                </Directory>
+            </Directory>
+
+            <!-- Start Menu folder & shortcut with explicit System.AppUserModel.ID for taskbar grouping & pinning -->
+            <Directory Id='ProgramMenuFolder'>
+                <Directory Id='ApplicationProgramsFolder' Name='Overture'>
+                    <Component Id='StartMenuShortcut' Guid='7B2E41D0-68C5-4D19-9F42-81A3C6E904B2'>
+                        <Shortcut
+                            Id='ApplicationStartMenuShortcut'
+                            Name='Overture'
+                            Description='Overture - Worship Projection Application'
+                            Target='[APPLICATIONFOLDER]overture.exe'
+                            WorkingDirectory='APPLICATIONFOLDER'
+                            Icon='ProductICO'>
+                            <ShortcutProperty
+                                Key='System.AppUserModel.ID'
+                                Value='Overture.WorshipProjection.App.1'/>
+                        </Shortcut>
+                        <RemoveFolder Id='CleanUpShortCut' Directory='ApplicationProgramsFolder' On='uninstall'/>
+                        <RegistryValue
+                            Root='HKCU'
+                            Key='Software\Overture\Installer'
+                            Name='StartMenuShortcutInstalled'
+                            Type='integer'
+                            Value='1'
+                            KeyPath='yes'/>
+                    </Component>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature
+            Id='MainApplication'
+            Title='Overture Application'
+            Description='Installs Overture desktop application, multi-monitor GPU renderer, and libmpv media runtime.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+            <ComponentRef Id='MainExecutable'/>
+            <ComponentRef Id='WgpuD3dCompilerRuntime'/>
+            <ComponentRef Id='LicenseDocument'/>
+            <ComponentRef Id='LibmpvRuntime'/>
+            <ComponentRef Id='MpvDefaultConfig'/>
+            <ComponentRef Id='AppIconAsset'/>
+            <ComponentRef Id='StartMenuShortcut'/>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        <Property Id='WIXUI_INSTALLDIR' Value='APPLICATIONFOLDER'/>
+        <UIRef Id='WixUI_InstallDir'/>
+        <WixVariable Id='WixUILicenseRtf' Value='$(sys.SOURCEFILEDIR)..\..\..\LICENSE.rtf'/>
+
+    </Product>
+
+</Wix>

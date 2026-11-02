@@ -13,6 +13,7 @@
 # Local redistributables (large binaries fetched during packaging if not tracked)
 /redist/*.7z
 /redist/*.exe
+/redist/*.dll
 
 # IDE & OS files
 .vscode/
