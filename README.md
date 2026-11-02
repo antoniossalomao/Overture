@@ -1,36 +1,95 @@
 # Overture
 
-Aplicativo desktop nativo em **Rust** para Windows voltado à montagem e projeção de letras, Bíblia, mídias, contagem regressiva, placar e avisos em cultos, com saída principal fullscreen acelerada por GPU (`wgpu` + `cosmic-text`), tela de palco, monitor de retorno e controle remoto web via rede local.
+Aplicativo desktop nativo em **Rust** para **Windows** voltado à montagem e projeção de letras, Bíblia, mídias, contagem regressiva, placar e avisos em cultos e eventos. Possui saída principal fullscreen acelerada por GPU (`wgpu` + `cosmic-text`), tela de palco independente, monitor de retorno com tema próprio, controle remoto via celular na rede local (`axum` HTTP + WebSocket), internacionalização completa em tempo real (**PT-BR** / **EN**) e instalador nativo `.msi` (`cargo-wix`).
 
-## Arquitetura do Workspace
+---
 
-| Crate | Caminho | Responsabilidade |
+## Principais Funcionalidades
+
+- **Biblioteca de Músicas & Importação Inteligente (`crates/import`, `crates/storage`)**
+  - Importação em lote de arquivos `.txt` (`UTF-8` e `ISO-8859-1` / `Windows-1252`), OpenSong XML, OpenLP (OpenLyrics) XML, PowerPoint nativo (`.pptx`) e pacote JSON próprio.
+  - Extração automática de `Artista - Título.txt` (ou fallback para a primeira linha), remoção de cabeçalhos de sites de cifra/letra, máximo de 2 linhas por slide sem misturar estrofes, respeito à pontuação e proteção gramatical contra separação de artigos/preposições (`de`, `da`, `do`, `no`, `na`, `pra`, `pro`, `com`, `em`, `por` etc.), além de marcador `quebra_forcada` para revisão.
+  - Remoção de duplicatas exatas, sinalização de homônimos (`título + artista`), arquivamento reversível e busca indexada em **menos de 100 ms** mesmo em bibliotecas com mais de 500 músicas.
+- **Montagem de Culto & Playlist Temporária (`crates/core`, `crates/storage`)**
+  - Ordem de culto persistente e playlist rápida temporária suportando músicas, versículos bíblicos, vídeos, áudios, imagens, apresentações `.pptx`, avisos, contagem regressiva e placar manual.
+  - Modo de apresentação automática com tempo configurável por slide.
+- **Saídas Multi-Monitor em GPU (`crates/render`, `crates/output`)**
+  - Enumeração nativa Win32 com suporte a **Per-Monitor DPI V2** e `AppUserModelID` (`Overture.WorshipProjection.App.1`).
+  - **Saída Principal:** texto com sombra, contorno, alinhamento configurável, fundo sólido, gradiente, imagem ou vídeo/motion background em tempo real; modos Tela Preta, Limpar Texto e Logo.
+  - **Tela de Palco:** slide atual, prévia do próximo slide, relógio/cronômetro e notas/avisos de palco.
+  - **Monitor de Retorno:** tema exclusivo de alto contraste + alertas imediatos para a equipe.
+- **Mídias, Vídeo de Fundo, Contagem Regressiva & Placar (`crates/media`)**
+  - Integração dinâmica via C-API com `libmpv` (`libmpv-2.dll`) para decodificação de vídeo/áudio e composição RGBA em textura `wgpu`, com fallback automático para fundos animados procedurais (`motion://aurora`, `motion://ocean`, `motion://warm`).
+  - Contagem regressiva sincronizada na saída e placar manual controlado em tempo real pelo operador.
+- **Bíblia com Licenças Explícitas (`crates/storage`, `crates/import`)**
+  - Inclui sementes em **Domínio Público** (`TB1917` — Tradução Brasileira 1917 em PT-BR e `WEB` — World English Bible em EN) e importador para Zefania XML e JSON com verificação obrigatória de licença.
+  - Busca por referência (`João 3:16`, `Sl 23:1-6`) e por palavras-chave, favoritos e histórico de leitura.
+- **Controle Remoto Mobile na Rede Local (`crates/control`)**
+  - Servidor `axum` HTTP + WebSocket restrito à LAN e protegido por token fixo configurável, acompanhado de Web App responsivo para celular (próximo/anterior, tela preta/logo, itens do culto e alerta de palco).
+- **Escala, Relatórios, Exportação e Backup Completo**
+  - Cadastro de equipe, escalas por culto com contagem de participações e relatórios de músicas mais tocadas por período e por dia da semana.
+  - Exportação em `.txt` e `.json`, além de backup completo (`.zip` contendo snapshot consistente `VACUUM INTO` do SQLite + pasta de mídias) e restauração íntegra.
+
+---
+
+## Arquitetura do Workspace (10 Crates)
+
+| Crate | Diretório | Responsabilidade |
 |---|---|---|
-| `overture-core` | `crates/core` | Modelos de domínio (`Song`, `Slide`, `Service`, `Theme`, `Bible`, `Media`), máquina de estado e eventos |
-| `overture-storage` | `crates/storage` | Persistência SQLite (`sqlx`), migrações, busca rápida, relatórios e backup/restauração |
-| `overture-import` | `crates/import` | Parsers TXT (PT-BR/EN com divisão semântica), OpenSong, OpenLP XML, PowerPoint (`.pptx`) e exportadores |
-| `overture-render` | `crates/render` | Composição visual (`cosmic-text` + `wgpu`): fundos, vídeo RGBA, sombra, palco, retorno, placar e cronômetro |
-| `overture-media` | `crates/media` | Reprodução de vídeo de fundo, vídeo e áudio via `libmpv` + fundos animados procedurais |
-| `overture-output` | `crates/output` | Enumeração de monitores Windows (`Win32`), janelas fullscreen independentes e telemetria de latência |
-| `overture-control` | `crates/control` | Servidor HTTP/WebSocket local (`axum`) autenticado por token fixo + Web App responsivo para celular |
-| `overture-i18n` | `crates/i18n` | Internacionalização PT-BR e EN com troca dinâmica em tempo real |
-| `overture-ui` | `crates/ui` | Interface desktop nativa em Slint (`.slint`) com as 7 telas operacionais |
-| `overture` | `crates/app` | Binário principal integrando estado, banco, janelas de saída, servidor remoto e UI |
+| `overture-core` | `crates/core` | Modelos de domínio, máquina de estado reativa (`StateEngine`), atalhos e eventos |
+| `overture-storage` | `crates/storage` | SQLite (`sqlx`), migrações, busca rápida, Bíblia, escalas, relatórios e backup `.zip` |
+| `overture-import` | `crates/import` | Parsers TXT (PT-BR/EN), OpenSong, OpenLP, PowerPoint (`.pptx`), Zefania XML e exportadores |
+| `overture-render` | `crates/render` | Compositor `cosmic-text` + `wgpu` (principal, palco, retorno, vídeo RGBA, placar e timer) |
+| `overture-media` | `crates/media` | Motor `libmpv` dinâmico (`libloading`) + gerador procedural de motion backgrounds |
+| `overture-output` | `crates/output` | Monitores Win32, DPI V2, janelas fullscreen independentes e telemetria de latência |
+| `overture-control` | `crates/control` | API REST + WebSocket (`axum`) autenticada por token fixo + interface Web responsiva |
+| `overture-i18n` | `crates/i18n` | Dicionários completos `pt-BR` e `en` com alternância instantânea em tempo de execução |
+| `overture-ui` | `crates/ui` | Componentes nativos em Slint (`main.slint`) cobrindo as 7 telas operacionais |
+| `overture` | `crates/app` | Executável desktop Windows integrando banco, saídas GPU, mídia, API remota e UI |
 
-## Compilação e Testes
+---
+
+## Compilação, Execução e Testes
+
+### Pré-requisitos
+- **Windows 10 / 11 (x64)**
+- **Rust Toolchain (`stable-x86_64-pc-windows-msvc`)** + Visual Studio C++ Build Tools
+
+### Comandos Principais
 
 ```powershell
-cargo build --workspace
+# Executar toda a suíte de testes (unitários, integração, regressão de 20 músicas, API e multi-monitor)
 cargo test --workspace
-cargo run -p overture
+
+# Executar o spike de saída fullscreen em monitor (Fase 0)
+cargo run -p overture-output --example monitor_spike
+
+# Executar smoke test automatizado da aplicação completa
+cargo run -p overture -- --smoke-test
+
+# Iniciar o aplicativo desktop Overture
+cargo run --release -p overture
 ```
 
-## Instalador Windows (MSI)
+---
+
+## Instalador Windows (`.msi`)
+
+O instalador nativo `.msi` é construído via `cargo-wix` + **WiX Toolset v3.14** utilizando [`crates/app/wix/main.wxs`](crates/app/wix/main.wxs) e empacota automaticamente `overture.exe`, `libmpv-2.dll`, `d3dcompiler_47.dll`, `mpv.conf`, `overture.ico` (16/32/48/64/128/256 px) e `LICENSE.rtf`:
 
 ```powershell
-cargo wix --package overture --nocapture
+powershell -ExecutionPolicy Bypass -File scripts/build-msi.ps1
 ```
+
+O script gera `target\wix\overture-0.1.0-x86_64.msi` e executa [`scripts/verify-msi.ps1`](scripts/verify-msi.ps1) para validar:
+- Registro em **Configurações > Aplicativos > Aplicativos instalados** com ícone e desinstalador;
+- Atalho no **Menu Iniciar** com `System.AppUserModel.ID = Overture.WorshipProjection.App.1` (agrupamento e fixação na barra de tarefas);
+- `UpgradeCode` fixo (`{9F4E8A71-3D2C-4B85-A619-7C80E5D12F01}`) para atualização *in-place* sem desinstalação manual.
+
+Consulte [`docs/guia-completo.md`](docs/guia-completo.md) para detalhes operacionais, endpoints da API remota e decisões de projeto.
+
+---
 
 ## Licença
 
-Distribuído sob a licença **GNU General Public License v3.0** (`GPL-3.0-or-later`). Veja [`LICENSE`](LICENSE).
+Distribuído sob a licença **GNU General Public License v3.0 or later** (`GPL-3.0-or-later`). Consulte [`LICENSE`](LICENSE).
