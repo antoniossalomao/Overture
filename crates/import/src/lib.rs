@@ -1,10 +1,17 @@
 //! Lyrics and presentation importers/exporters for Overture.
 
 pub mod bible_import;
+pub mod export;
+pub mod pptx;
 pub mod txt;
 pub mod xml_songs;
 
 pub use bible_import::{JsonBibleDocument, parse_json_bible_file, parse_zefania_bible_xml};
+pub use export::{
+    OvertureJsonBundle, export_json_bundle_to_file, export_song_to_txt_string,
+    export_songs_to_txt_directory, import_json_bundle_from_file,
+};
+pub use pptx::{ParsedPptxPresentation, parse_pptx_bytes, parse_pptx_file};
 
 pub use txt::{
     BatchTxtImportReport, DEFAULT_MAX_LINE_CHARS, MAX_LINES_PER_SLIDE, MIN_STANDARD_LYRIC_CHARS,
