@@ -5,10 +5,10 @@ use chrono::Timelike;
 use directories::ProjectDirs;
 use overture_control::{ControlState, start_control_server};
 use overture_core::{
-    AppSettings, BackgroundSpec, BibleVerse, BibleVersion, CoreCommand, DisplayMode,
-    HorizontalAlign, LivePresentationItem, MediaItem, MediaKind, OutputRole, PresentationSlide,
-    RgbaColor, Service, ServiceItem, ServiceItemKind, ServiceItemParams, Song, SongSlide,
-    StateEngine, Theme, ThemeConfig,
+    AppSettings, BackgroundSpec, BibleVerse, BibleVersion, CoreCommand, CountdownState,
+    DisplayMode, HorizontalAlign, LivePresentationItem, MediaItem, MediaKind, OutputRole,
+    PresentationSlide, RgbaColor, Service, ServiceItem, ServiceItemKind, ServiceItemParams, Song,
+    SongSlide, StateEngine, Theme, ThemeConfig,
 };
 use overture_i18n::{I18n, Locale};
 use overture_import::{
@@ -25,16 +25,17 @@ use overture_output::{
 use overture_render::SlideCompositor;
 use overture_storage::{
     CANONICAL_BIBLE_BOOKS, Storage, canonical_book_by_order, create_full_backup,
-    restore_full_backup,
+    parse_bible_reference, restore_full_backup,
 };
 use overture_ui::{
     MainWindow, UiBibleBookGridRow, UiBibleBookTile, UiBibleChapterVerse, UiBibleSearchHit,
     UiMediaRow, UiNumberGridRow, UiPlaylistRow, UiReportRow, UiScheduleRow, UiSlideCard,
     UiSongRow, UiThemeRow, ui_strings_for_locale,
 };
+use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::{
-    ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode,
-    VecModel,
+    ComponentHandle, Image, ModelRc, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer, SharedString,
+    Timer, TimerMode, VecModel,
 };
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -76,6 +77,22 @@ struct AppContext {
     cached_chapter_verses: Vec<BibleVerse>,
 
     preview_compositor: SlideCompositor,
+    last_preview_rev: u64,
+    last_preview_pts: u64,
+    last_preview_role: i32,
+    last_preview_sec_bucket: i64,
+}
+
+struct HeadlessAuditPlatform {
+    window: Rc<MinimalSoftwareWindow>,
+}
+
+impl slint::platform::Platform for HeadlessAuditPlatform {
+    fn create_window_adapter(
+        &self,
+    ) -> std::result::Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
+        Ok(self.window.clone())
+    }
 }
 
 impl AppContext {
@@ -152,6 +169,26 @@ fn main() -> Result<()> {
 
     let args: Vec<String> = std::env::args().collect();
     let is_smoke_test = args.iter().any(|a| a == "--smoke-test");
+    let render_audit_dir = args
+        .windows(2)
+        .find(|w| w[0] == "--render-audit")
+        .map(|w| PathBuf::from(&w[1]));
+    let is_headless_test = is_smoke_test || render_audit_dir.is_some();
+
+    let audit_sw_window = if render_audit_dir.is_some() {
+        let win = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        let _ = slint::platform::set_platform(Box::new(HeadlessAuditPlatform {
+            window: win.clone(),
+        }));
+        Some(win)
+    } else {
+        if !is_smoke_test {
+            let _ = slint::BackendSelector::new()
+                .renderer_name("skia".into())
+                .select();
+        }
+        None
+    };
 
     let rt = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
@@ -159,7 +196,7 @@ fn main() -> Result<()> {
             .build()?,
     );
 
-    let (db_path, media_dir) = resolve_app_paths(is_smoke_test)?;
+    let (db_path, media_dir) = resolve_app_paths(is_headless_test)?;
     std::fs::create_dir_all(&media_dir)?;
     let song_themes_path = db_path
         .parent()
@@ -210,7 +247,7 @@ fn main() -> Result<()> {
         .block_on(storage.list_bible_versions())
         .unwrap_or_default();
 
-    let media_engine = MediaEngine::spawn(640, 360);
+    let media_engine = MediaEngine::spawn(960, 540);
     if let Some(main_t) = themes.iter().find(|t| t.id == initial_theme_id)
         && let BackgroundSpec::Video {
             path,
@@ -230,7 +267,7 @@ fn main() -> Result<()> {
         settings.api_token.clone(),
     );
 
-    let bind_port = if is_smoke_test { 0 } else { settings.api_port };
+    let bind_port = if is_headless_test { 0 } else { settings.api_port };
     let bind_addr: SocketAddr = format!("0.0.0.0:{bind_port}").parse()?;
     let ctrl_handle = rt.block_on(start_control_server(bind_addr, ctrl_state.clone()))?;
     let lan_url = ctrl_handle
@@ -257,6 +294,15 @@ fn main() -> Result<()> {
     }
 
     let ui = MainWindow::new()?;
+    if !is_headless_test {
+        let monitors = enumerate_monitors();
+        if let Some(primary) = monitors.iter().find(|m| m.is_primary).or_else(|| monitors.first())
+            && (primary.width <= 1600 || primary.height <= 980)
+        {
+            ui.window().set_maximized(true);
+        }
+    }
+
     ui.set_tr(ui_strings_for_locale(locale));
     ui.set_settings_locale_index(if locale == Locale::En { 1 } else { 0 });
     ui.set_settings_api_port(settings.api_port.to_string().into());
@@ -266,10 +312,11 @@ fn main() -> Result<()> {
     ui.set_shortcut_prev(settings.shortcuts.prev_slide.clone().into());
     ui.set_shortcut_black(settings.shortcuts.black_screen.clone().into());
     ui.set_shortcut_logo(settings.shortcuts.logo_screen.clone().into());
+    ui.set_windowed_output_mode(settings.monitor_assignment.windowed_mode);
 
     populate_monitor_options(&ui);
 
-    let output_mgr = if is_smoke_test {
+    let output_mgr = if is_headless_test {
         None
     } else {
         OutputManager::spawn(
@@ -307,6 +354,10 @@ fn main() -> Result<()> {
         bible_verse: 1,
         cached_chapter_verses: Vec::new(),
         preview_compositor: SlideCompositor::new(),
+        last_preview_rev: u64::MAX,
+        last_preview_pts: u64::MAX,
+        last_preview_role: -1,
+        last_preview_sec_bucket: -1,
     }));
 
     // Stage and present the first song on startup so Column 2 & Column 3 look immediately ready like Holyrics
@@ -320,6 +371,8 @@ fn main() -> Result<()> {
         }
     }
 
+    wire_callbacks(&ui, ctx.clone());
+
     if is_smoke_test {
         println!("OVERTURE_SMOKE_OK");
         ctrl_handle.shutdown();
@@ -327,7 +380,12 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    wire_callbacks(&ui, ctx.clone());
+    if let (Some(audit_dir), Some(sw_win)) = (render_audit_dir, audit_sw_window) {
+        run_visual_render_audit(&ui, &ctx, &sw_win, &audit_dir)?;
+        ctrl_handle.shutdown();
+        ctx.borrow().media_engine.shutdown();
+        return Ok(());
+    }
 
     // 200ms UI live preview + GPU telemetry refresh timer
     let preview_timer = Timer::default();
@@ -535,6 +593,25 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             let c = ctx.borrow();
             if let Some(w) = ui_weak.upgrade() {
                 refresh_songs_ui(&w, &c, q.as_str(), w.get_show_archived());
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_search_songs_accepted(move |q| {
+            let mut c = ctx.borrow_mut();
+            let Some(w) = ui_weak.upgrade() else {
+                return;
+            };
+            let show_arch = w.get_show_archived();
+            refresh_songs_ui(&w, &c, q.as_str(), show_arch);
+            if let Ok(songs) = c.rt.block_on(c.storage.search_songs(q.as_str(), show_arch, None, 1))
+                && let Some(first) = songs.into_iter().next()
+            {
+                let title = first.title.clone();
+                stage_and_optionally_project_song(&w, &mut c, first, true, 0);
+                w.set_status_banner(format!("Projetando '{title}'.").into());
             }
         });
     }
@@ -1254,6 +1331,25 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             }
         });
     }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_save_operator_notes(move |notes| {
+            let mut c = ctx.borrow_mut();
+            let notes_str = notes.to_string();
+            c.engine.dispatch(CoreCommand::UpdateCurrentItemNotes {
+                notes: notes_str.clone(),
+            });
+            if let Some(mut song) = c.staged_song.clone() {
+                song.notes = notes_str;
+                let _ = c.rt.block_on(c.storage.update_song(&song));
+                c.staged_song = Some(song);
+            }
+            if let Some(w) = ui_weak.upgrade() {
+                sync_output_state_to_ui(&w, &mut c);
+            }
+        });
+    }
 
     // ==================== THEMES & STRIP (COL 5 + THEME STUDIO MODAL) ====================
     {
@@ -1286,10 +1382,44 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
                         c.save_song_theme_bindings();
                     }
                     update_active_theme_indicator(&w, &mut c);
+                    render_countdown_preview_into_ui(
+                        &w,
+                        &mut c,
+                        "10",
+                        "0",
+                        "",
+                        "Para iniciar o culto",
+                        0,
+                        true,
+                        false,
+                    );
                 }
             }
             if let Some(w) = ui_weak.upgrade() {
                 sync_output_state_to_ui(&w, &mut c);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_toggle_save_theme_for_song(move |enabled| {
+            let mut c = ctx.borrow_mut();
+            let Some(w) = ui_weak.upgrade() else {
+                return;
+            };
+            let sel_song = w.get_selected_song_id() as i64;
+            if sel_song > 0 {
+                if enabled {
+                    let tid = c.active_theme_id;
+                    c.song_theme_map.insert(sel_song, tid);
+                    c.save_song_theme_bindings();
+                    w.set_status_banner("Tema vinculado a esta música.".into());
+                } else {
+                    c.song_theme_map.remove(&sel_song);
+                    c.save_song_theme_bindings();
+                    w.set_status_banner("Vínculo de tema removido desta música.".into());
+                }
             }
         });
     }
@@ -1513,20 +1643,47 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
-        ui.on_start_studio_countdown(move |mins_str, secs_str, before_str, after_str, mode| {
-            let total_secs = compute_countdown_seconds(mins_str.as_str(), secs_str.as_str(), mode);
-            let label = build_countdown_label(before_str.as_str(), after_str.as_str());
-            let mut c = ctx.borrow_mut();
-            c.engine.dispatch(CoreCommand::StartCountdown {
-                label,
-                seconds: total_secs,
-                show_on_main: true,
-            });
-            if let Some(w) = ui_weak.upgrade() {
-                sync_output_state_to_ui(&w, &mut c);
-                w.set_status_banner("Contagem regressiva iniciada na saída ao vivo!".into());
-            }
-        });
+        ui.on_preview_studio_countdown(
+            move |mins_str, secs_str, before_str, after_str, mode, pad_zero, hide_zero_min| {
+                let mut c = ctx.borrow_mut();
+                if let Some(w) = ui_weak.upgrade() {
+                    render_countdown_preview_into_ui(
+                        &w,
+                        &mut c,
+                        mins_str.as_str(),
+                        secs_str.as_str(),
+                        before_str.as_str(),
+                        after_str.as_str(),
+                        mode,
+                        pad_zero,
+                        hide_zero_min,
+                    );
+                }
+            },
+        );
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_start_studio_countdown(
+            move |mins_str, secs_str, before_str, after_str, mode, pad_zero, hide_zero_min| {
+                let total_secs =
+                    compute_countdown_seconds(mins_str.as_str(), secs_str.as_str(), mode);
+                let mut c = ctx.borrow_mut();
+                c.engine.dispatch(CoreCommand::StartStudioCountdown {
+                    seconds: total_secs,
+                    text_before: before_str.trim().to_string(),
+                    text_after: after_str.trim().to_string(),
+                    pad_zero,
+                    hide_zero_min,
+                    show_on_main: true,
+                });
+                if let Some(w) = ui_weak.upgrade() {
+                    sync_output_state_to_ui(&w, &mut c);
+                    w.set_status_banner("Contagem regressiva iniciada na saída ao vivo!".into());
+                }
+            },
+        );
     }
     {
         let ui_weak = ui.as_weak();
@@ -1772,7 +1929,7 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
         ui.on_bible_search_edited(move |q| {
-            let c = ctx.borrow();
+            let mut c = ctx.borrow_mut();
             let Some(w) = ui_weak.upgrade() else {
                 return;
             };
@@ -1781,10 +1938,60 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
                 w.set_bible_search_hits(ModelRc::new(VecModel::from(
                     Vec::<UiBibleSearchHit>::new(),
                 )));
+                if w.get_bible_right_submode() == 3 {
+                    w.set_bible_right_submode(0);
+                }
                 return;
             }
             let ver_id = c.current_bible_version_id();
             let abbr = c.current_bible_version_abbr();
+
+            // 1. Holyrics instant reference quick-locate ("jo 3 16", "jo3.16", "1sm 17 45", "sl 23", "gn")
+            if let Some(parsed) = parse_bible_reference(trimmed)
+                && let Some(order) = parsed.book_order
+            {
+                let max_ch = c
+                    .rt
+                    .block_on(c.storage.count_bible_chapters(ver_id, order))
+                    .unwrap_or(1)
+                    .max(1);
+                c.bible_book_order = order.clamp(1, 66);
+                c.bible_chapter = parsed.chapter.unwrap_or(1).clamp(1, max_ch);
+                c.bible_verse = parsed.verse_start.unwrap_or(1).max(1);
+                w.set_bible_right_submode(0);
+                refresh_bible_studio_ui(&w, &mut c);
+
+                let is_en = c.i18n.locale() == Locale::En;
+                let book_name = canonical_book_by_order(c.bible_book_order)
+                    .map(|b| if is_en { b.name_en } else { b.name_pt })
+                    .unwrap_or("Bíblia");
+                w.set_status_banner(
+                    format!(
+                        "Localizado: {} {}:{} ({}) — pressione Enter para projetar",
+                        book_name, c.bible_chapter, c.bible_verse, abbr
+                    )
+                    .into(),
+                );
+
+                if let Ok(hits) = c.rt.block_on(c.storage.search_bible(ver_id, trimmed, 60)) {
+                    let ui_hits: Vec<UiBibleSearchHit> = hits
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, v)| UiBibleSearchHit {
+                            row_idx: i as i32,
+                            reference: v.reference(Some(&abbr)).into(),
+                            text: v.text.into(),
+                            book_order: v.book_order,
+                            chapter: v.chapter,
+                            verse: v.verse,
+                        })
+                        .collect();
+                    w.set_bible_search_hits(ModelRc::new(VecModel::from(ui_hits)));
+                }
+                return;
+            }
+
+            // 2. Full-text verse search ("amou o mundo", "pastor", "princípio")
             if let Ok(hits) = c.rt.block_on(c.storage.search_bible(ver_id, trimmed, 60)) {
                 let ui_hits: Vec<UiBibleSearchHit> = hits
                     .into_iter()
@@ -1799,6 +2006,55 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
                     })
                     .collect();
                 w.set_bible_search_hits(ModelRc::new(VecModel::from(ui_hits)));
+                w.set_bible_right_submode(3);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_bible_search_accepted(move |q| {
+            let mut c = ctx.borrow_mut();
+            let Some(w) = ui_weak.upgrade() else {
+                return;
+            };
+            let trimmed = q.trim();
+            let ver_id = c.current_bible_version_id();
+            let abbr = c.current_bible_version_abbr();
+
+            if !trimmed.is_empty() {
+                if let Some(parsed) = parse_bible_reference(trimmed)
+                    && let Some(order) = parsed.book_order
+                {
+                    let max_ch = c
+                        .rt
+                        .block_on(c.storage.count_bible_chapters(ver_id, order))
+                        .unwrap_or(1)
+                        .max(1);
+                    c.bible_book_order = order.clamp(1, 66);
+                    c.bible_chapter = parsed.chapter.unwrap_or(1).clamp(1, max_ch);
+                    c.bible_verse = parsed.verse_start.unwrap_or(1).max(1);
+                    refresh_bible_studio_ui(&w, &mut c);
+                } else if let Ok(hits) = c.rt.block_on(c.storage.search_bible(ver_id, trimmed, 1))
+                    && let Some(first) = hits.into_iter().next()
+                {
+                    c.bible_book_order = first.book_order.clamp(1, 66);
+                    c.bible_chapter = first.chapter.max(1);
+                    c.bible_verse = first.verse.max(1);
+                    refresh_bible_studio_ui(&w, &mut c);
+                }
+            }
+
+            let target_v = c.bible_verse;
+            project_active_bible_chapter_at_verse(&mut c, target_v);
+            w.set_bible_right_submode(0);
+            refresh_bible_favs_and_history_ui(&w, &c);
+            sync_output_state_to_ui(&w, &mut c);
+
+            if let Some(v) = c.cached_chapter_verses.iter().find(|x| x.verse == target_v) {
+                w.set_status_banner(
+                    format!("Projetando {} {}:{} ({})", v.book, v.chapter, v.verse, abbr).into(),
+                );
             }
         });
     }
@@ -1811,6 +2067,7 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             c.bible_chapter = chapter.max(1);
             c.bible_verse = verse.max(1);
             if let Some(w) = ui_weak.upgrade() {
+                w.set_bible_right_submode(0);
                 refresh_bible_studio_ui(&w, &mut c);
                 let target_v = c.bible_verse;
                 project_active_bible_chapter_at_verse(&mut c, target_v);
@@ -1834,10 +2091,14 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
         ui.on_apply_monitor_outputs(move || {
-            let c = ctx.borrow();
+            let mut c = ctx.borrow_mut();
             let Some(w) = ui_weak.upgrade() else {
                 return;
             };
+            let windowed = w.get_windowed_output_mode();
+            c.settings.monitor_assignment.windowed_mode = windowed;
+            let _ = c.rt.block_on(c.storage.save_settings(&c.settings));
+
             let ret_themes: Vec<Theme> = c
                 .cached_themes
                 .iter()
@@ -1850,23 +2111,36 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
                 });
             }
 
+            let fullscreen = !windowed;
             if let Some(mgr) = &c.output_mgr {
-                apply_single_role_monitor(mgr, OutputRole::Main, w.get_main_monitor_index(), true);
+                apply_single_role_monitor(
+                    mgr,
+                    OutputRole::Main,
+                    w.get_main_monitor_index(),
+                    fullscreen,
+                    fullscreen,
+                );
                 apply_single_role_monitor(
                     mgr,
                     OutputRole::Stage,
                     w.get_stage_monitor_index(),
+                    fullscreen,
                     false,
                 );
                 apply_single_role_monitor(
                     mgr,
                     OutputRole::Return,
                     w.get_return_monitor_index(),
+                    fullscreen,
                     false,
                 );
                 w.set_status_banner(
-                    "Saídas multi-monitor atualizadas (Esc em qualquer tela fecha aquela saída)."
-                        .into(),
+                    if windowed {
+                        "Saídas abertas em modo janela flutuante (Esc fecha a janela)."
+                    } else {
+                        "Saídas multi-monitor fullscreen atualizadas (Esc fecha aquela saída)."
+                    }
+                    .into(),
                 );
             }
         });
@@ -1977,13 +2251,14 @@ fn apply_single_role_monitor(
     mgr: &OutputManager,
     role: OutputRole,
     dropdown_idx: i32,
+    fullscreen: bool,
     topmost: bool,
 ) {
     if dropdown_idx > 0 {
         let _ = mgr.open_window(RoleWindowTarget {
             role,
             monitor_index: (dropdown_idx - 1) as usize,
-            fullscreen: true,
+            fullscreen,
             topmost,
         });
     } else {
@@ -2001,9 +2276,7 @@ fn stage_and_optionally_project_song(
     ui.set_selected_song_id(song.id as i32);
     ui.set_active_header_title(song.title.clone().into());
     ui.set_active_header_subtitle(song.artist.clone().into());
-    if !song.notes.trim().is_empty() {
-        ui.set_operator_notes(song.notes.clone().into());
-    }
+    ui.set_operator_notes(song.notes.clone().into());
 
     if let Some(&bound_tid) = c.song_theme_map.get(&song.id) {
         ui.set_save_theme_to_song(true);
@@ -2219,6 +2492,17 @@ fn refresh_all_ui_models(ui: &MainWindow, c: &mut AppContext) {
     refresh_themes_ui(ui, c);
     refresh_bible_studio_ui(ui, c);
     refresh_schedule_and_reports_ui(ui, c, ui.get_report_weekday_index());
+    render_countdown_preview_into_ui(
+        ui,
+        c,
+        "10",
+        "0",
+        "",
+        "Para iniciar o culto",
+        0,
+        true,
+        false,
+    );
     sync_output_state_to_ui(ui, c);
 }
 
@@ -2304,7 +2588,7 @@ fn refresh_themes_ui(ui: &MainWindow, c: &mut AppContext) {
         };
         let thumb_frame =
             c.preview_compositor
-                .compose_theme_preview(&t.config, sample, 160, 90, None);
+                .compose_theme_preview(&t.config, sample, 320, 180, None);
         let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
             &thumb_frame.pixels,
             thumb_frame.width,
@@ -2353,8 +2637,8 @@ fn update_active_theme_indicator(ui: &MainWindow, c: &mut AppContext) {
         let frame = c.preview_compositor.compose_theme_preview(
             &active_t.config,
             "Santo! Santo!",
-            240,
-            135,
+            320,
+            180,
             None,
         );
         let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
@@ -2652,48 +2936,64 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
 fn update_live_preview_and_telemetry(ui: &MainWindow, c: &mut AppContext) {
     let st = c.engine.snapshot();
     let vf = c.media_engine.subscribe_frames().borrow().clone();
-    let vf_view = vf.as_ref().map(|v| v.as_view());
+    let cur_pts = vf.as_ref().map(|v| v.pts_ms).unwrap_or(0);
+    let role_tab = ui.get_preview_role_tab();
+    let sec_bucket = chrono::Local::now().timestamp() / 15;
 
-    // Always render Main 16:9 preview (used in Col 3 & Bible mini-monitor)
-    let main_frame = c
-        .preview_compositor
-        .compose(&st, OutputRole::Main, 480, 270, vf_view);
-    let main_buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
-        &main_frame.pixels,
-        main_frame.width,
-        main_frame.height,
-    );
-    ui.set_live_main_image(Image::from_rgba8(main_buf));
+    let needs_recompose = st.revision != c.last_preview_rev
+        || cur_pts != c.last_preview_pts
+        || role_tab != c.last_preview_role
+        || (role_tab == 1 && sec_bucket != c.last_preview_sec_bucket);
 
-    // Render Stage or Return preview on demand when selected in Col 3's preview role tabs
-    match ui.get_preview_role_tab() {
-        1 => {
-            let stage_frame =
-                c.preview_compositor
-                    .compose(&st, OutputRole::Stage, 480, 270, None);
-            let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
-                &stage_frame.pixels,
-                stage_frame.width,
-                stage_frame.height,
-            );
-            ui.set_live_stage_image(Image::from_rgba8(buf));
+    if needs_recompose {
+        c.last_preview_rev = st.revision;
+        c.last_preview_pts = cur_pts;
+        c.last_preview_role = role_tab;
+        c.last_preview_sec_bucket = sec_bucket;
+
+        let vf_view = vf.as_ref().map(|v| v.as_view());
+
+        // Crisp 960×540 Main 16:9 preview (used in Col 3 & Bible mini-monitor)
+        let main_frame =
+            c.preview_compositor
+                .compose(&st, OutputRole::Main, 960, 540, vf_view);
+        let main_buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+            &main_frame.pixels,
+            main_frame.width,
+            main_frame.height,
+        );
+        ui.set_live_main_image(Image::from_rgba8(main_buf));
+
+        // Render Stage or Return preview at 960×540 when selected in Col 3's preview role tabs
+        match role_tab {
+            1 => {
+                let stage_frame =
+                    c.preview_compositor
+                        .compose(&st, OutputRole::Stage, 960, 540, None);
+                let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+                    &stage_frame.pixels,
+                    stage_frame.width,
+                    stage_frame.height,
+                );
+                ui.set_live_stage_image(Image::from_rgba8(buf));
+            }
+            2 => {
+                let ret_frame =
+                    c.preview_compositor
+                        .compose(&st, OutputRole::Return, 960, 540, None);
+                let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+                    &ret_frame.pixels,
+                    ret_frame.width,
+                    ret_frame.height,
+                );
+                ui.set_live_return_image(Image::from_rgba8(buf));
+            }
+            _ => {}
         }
-        2 => {
-            let ret_frame =
-                c.preview_compositor
-                    .compose(&st, OutputRole::Return, 480, 270, None);
-            let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
-                &ret_frame.pixels,
-                ret_frame.width,
-                ret_frame.height,
-            );
-            ui.set_live_return_image(Image::from_rgba8(buf));
-        }
-        _ => {}
-    }
 
-    if ui.get_active_modal() == 3 && ui.get_theme_bg_kind() == 3 {
-        render_theme_preview_into_ui(ui, c);
+        if ui.get_active_modal() == 3 && ui.get_theme_bg_kind() == 3 {
+            render_theme_preview_into_ui(ui, c);
+        }
     }
 
     if let Some(mgr) = &c.output_mgr {
@@ -2806,13 +3106,178 @@ fn render_theme_preview_into_ui(ui: &MainWindow, c: &mut AppContext) {
     let sample = "Santo! Santo! Santo!\nDeus Onipotente!";
     let frame = c
         .preview_compositor
-        .compose_theme_preview(&cfg, sample, 480, 270, vf_view);
+        .compose_theme_preview(&cfg, sample, 960, 540, vf_view);
     let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
         &frame.pixels,
         frame.width,
         frame.height,
     );
     ui.set_theme_live_preview(Image::from_rgba8(buf));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_countdown_preview_into_ui(
+    ui: &MainWindow,
+    c: &mut AppContext,
+    mins_str: &str,
+    secs_str: &str,
+    before_str: &str,
+    after_str: &str,
+    mode: i32,
+    pad_zero: bool,
+    hide_zero_min: bool,
+) {
+    let total_secs = compute_countdown_seconds(mins_str, secs_str, mode);
+    let cd = CountdownState {
+        active: true,
+        label: build_countdown_label(before_str, after_str),
+        text_before: before_str.trim().to_string(),
+        text_after: after_str.trim().to_string(),
+        pad_zero,
+        hide_zero_min,
+        remaining_secs: total_secs,
+        total_secs,
+        show_on_main: true,
+    };
+    let st = c.engine.snapshot();
+    let vf = c.media_engine.subscribe_frames().borrow().clone();
+    let vf_view = vf.as_ref().map(|v| v.as_view());
+    let frame =
+        c.preview_compositor
+            .compose_countdown_preview(&st.main_theme, &cd, 960, 540, vf_view);
+    let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+        &frame.pixels,
+        frame.width,
+        frame.height,
+    );
+    ui.set_countdown_live_preview(Image::from_rgba8(buf));
+}
+
+fn capture_audit_png(
+    sw_win: &MinimalSoftwareWindow,
+    phys_w: u32,
+    phys_h: u32,
+    scale_factor: f32,
+    out_path: &Path,
+) -> Result<()> {
+    sw_win.dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor });
+    sw_win.set_size(slint::PhysicalSize::new(phys_w, phys_h));
+    slint::platform::update_timers_and_animations();
+    sw_win.request_redraw();
+    let mut pixels = vec![Rgb8Pixel::default(); (phys_w * phys_h) as usize];
+    sw_win.draw_if_needed(|renderer| {
+        renderer.render(&mut pixels, phys_w as usize);
+    });
+    let mut raw = Vec::with_capacity((phys_w * phys_h * 3) as usize);
+    for p in &pixels {
+        raw.push(p.r);
+        raw.push(p.g);
+        raw.push(p.b);
+    }
+    let img = image::RgbImage::from_raw(phys_w, phys_h, raw)
+        .ok_or_else(|| anyhow::anyhow!("Failed to build RgbImage buffer"))?;
+    img.save(out_path)?;
+    Ok(())
+}
+
+fn run_visual_render_audit(
+    ui: &MainWindow,
+    ctx: &Rc<RefCell<AppContext>>,
+    sw_win: &MinimalSoftwareWindow,
+    audit_dir: &Path,
+) -> Result<()> {
+    std::fs::create_dir_all(audit_dir)?;
+    ui.show()?;
+    // Give procedural motion background thread 60ms to publish a crisp 960x540 frame
+    std::thread::sleep(Duration::from_millis(80));
+    {
+        let mut c = ctx.borrow_mut();
+        c.last_preview_rev = u64::MAX;
+        update_live_preview_and_telemetry(ui, &mut c);
+        render_countdown_preview_into_ui(
+            ui,
+            &mut c,
+            "10",
+            "0",
+            "",
+            "Para iniciar o culto",
+            0,
+            true,
+            false,
+        );
+    }
+
+    // 1. Worship 5-Column Studio at 1024x640 (1.0x) and 1536x960 (1.5x HiDPI — user's exact screen!)
+    ui.set_workspace_mode(0);
+    ui.set_active_modal(0);
+    capture_audit_png(
+        sw_win,
+        1024,
+        640,
+        1.0,
+        &audit_dir.join("01_worship_1024x640.png"),
+    )?;
+    capture_audit_png(
+        sw_win,
+        1536,
+        960,
+        1.5,
+        &audit_dir.join("02_worship_1536x960_150dpi.png"),
+    )?;
+    capture_audit_png(
+        sw_win,
+        1440,
+        900,
+        1.0,
+        &audit_dir.join("03_worship_1440x900.png"),
+    )?;
+
+    // 2. Holyrics 66-Book Bible Studio (Genesis 1) at 1536x960 (150% DPI -> 1024x640 logical)
+    ui.set_workspace_mode(1);
+    ui.set_active_modal(0);
+    capture_audit_png(
+        sw_win,
+        1536,
+        960,
+        1.5,
+        &audit_dir.join("04_bible_grid_1536x960_150dpi.png"),
+    )?;
+
+    // 3. Bible Quick-Locate typing "jo 3 16" + pressing Enter to project João 3:16!
+    ui.set_bible_search_query("jo 3 16".into());
+    ui.invoke_bible_search_edited("jo 3 16".into());
+    ui.invoke_bible_search_accepted("jo 3 16".into());
+    capture_audit_png(
+        sw_win,
+        1536,
+        960,
+        1.5,
+        &audit_dir.join("05_bible_quick_locate_jo316_150dpi.png"),
+    )?;
+
+    // 4. Countdown Studio Modal at 1536x960 (150% DPI -> 1024x640 logical)
+    ui.set_workspace_mode(0);
+    ui.set_active_modal(1);
+    capture_audit_png(
+        sw_win,
+        1536,
+        960,
+        1.5,
+        &audit_dir.join("06_countdown_modal_150dpi.png"),
+    )?;
+
+    // 5. Display Settings Modal at 1536x960 (150% DPI -> 1024x640 logical)
+    ui.set_active_modal(4);
+    capture_audit_png(
+        sw_win,
+        1536,
+        960,
+        1.5,
+        &audit_dir.join("07_display_modal_150dpi.png"),
+    )?;
+
+    println!("OVERTURE_RENDER_AUDIT_OK: {}", audit_dir.display());
+    Ok(())
 }
 
 fn compute_countdown_seconds(mins_str: &str, secs_str: &str, mode: i32) -> u64 {

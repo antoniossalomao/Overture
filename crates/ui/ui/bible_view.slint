@@ -54,6 +54,8 @@ export component HolyricsBibleView inherits Rectangle {
     in property <[UiBibleSearchHit]> favorite-hits: [];
     in property <[UiBibleSearchHit]> history-hits: [];
     in-out property <string> search-query: "";
+    in property <int> search-focus-seq: 0;
+    in property <int> search-append-seq: 0;
     in-out property <int> right-submode: 0; // 0 = Grid, 1 = Favorites, 2 = History, 3 = Search
 
     in property <image> live-preview-image;
@@ -67,8 +69,25 @@ export component HolyricsBibleView inherits Rectangle {
     callback favorite-active-verse();
     callback add-active-verse-to-service();
     callback search-edited(string);
+    callback search-accepted(string);
     callback jump-to-hit(int, int, int); // book_order, chapter, verse
     callback open-display-settings();
+
+    function sync-verse-scroll() {
+        if (root.chapter-verses.length > 1 && root.active-verse > 3) {
+            verses-scroll.scroll-to-ratio((root.active-verse - 1) / max(1, root.chapter-verses.length - 1));
+        } else {
+            verses-scroll.scroll-to-ratio(0.0);
+        }
+    }
+
+    changed active-chapter => {
+        root.sync-verse-scroll();
+    }
+
+    changed active-verse => {
+        root.sync-verse-scroll();
+    }
 
     background: ShadTheme.bg;
 
@@ -178,15 +197,16 @@ export component HolyricsBibleView inherits Rectangle {
                 }
 
                 // 4. Scrollable Chapter Verses List
-                ShadScrollArea {
+                verses-scroll := ShadScrollArea {
                     vertical-stretch: 1;
                     content-height: verses-vbox.preferred-height + 8px;
+                    changed content-height => { root.sync-verse-scroll(); }
 
                     verses-vbox := VerticalLayout {
                         width: parent.width;
                         spacing: 0px;
                         for cv in root.chapter-verses : Rectangle {
-                            min-height: v-txt.preferred-height + 12px;
+                            min-height: v-row-layout.preferred-height;
                             background: cv.verse == root.active-verse ? ShadTheme.live-row-bg :
                                         (cvta.has-hover ? ShadTheme.muted-hover : transparent);
 
@@ -195,15 +215,31 @@ export component HolyricsBibleView inherits Rectangle {
                                 background: ShadTheme.live-blue-bright;
                             }
 
-                            v-txt := Text {
-                                x: 10px;
-                                y: 6px;
-                                width: parent.width - 20px;
-                                text: cv.verse + " - " + cv.text;
-                                font-size: 12px;
-                                font-weight: cv.verse == root.active-verse ? 600 : 400;
-                                color: cv.verse == root.active-verse ? #ffffff : ShadTheme.fg-secondary;
-                                wrap: word-wrap;
+                            v-row-layout := HorizontalLayout {
+                                width: 100%;
+                                padding-left: 10px;
+                                padding-right: 8px;
+                                padding-top: 6px;
+                                padding-bottom: 6px;
+                                spacing: 5px;
+
+                                Text {
+                                    horizontal-stretch: 1;
+                                    text: cv.verse + " - " + cv.text;
+                                    font-size: 11.5px;
+                                    font-weight: cv.verse == root.active-verse ? 600 : 400;
+                                    color: cv.verse == root.active-verse ? #ffffff : ShadTheme.fg-secondary;
+                                    wrap: word-wrap;
+                                }
+
+                                if cv.is-favorite : VerticalLayout {
+                                    alignment: start;
+                                    LucideIcon {
+                                        name: "heart-fill";
+                                        icon-size: 11px;
+                                        tint: ShadTheme.amber;
+                                    }
+                                }
                             }
 
                             Rectangle {
@@ -223,57 +259,62 @@ export component HolyricsBibleView inherits Rectangle {
 
                 // 5. Public-Domain / License Attribution Card
                 Rectangle {
-                    height: 44px;
+                    height: 36px;
                     background: ShadTheme.bg;
                     Rectangle { y: 0px; height: 1px; background: ShadTheme.border; }
-                    Text {
-                        x: 8px; y: 6px;
-                        width: parent.width - 16px;
-                        height: parent.height - 12px;
-                        text: root.license-notice;
-                        font-size: 10px;
-                        color: ShadTheme.fg-subtle;
-                        wrap: word-wrap;
-                        vertical-alignment: center;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            horizontal-stretch: 1;
+                            text: root.license-notice;
+                            font-size: 9.5px;
+                            color: ShadTheme.fg-subtle;
+                            wrap: word-wrap;
+                            vertical-alignment: center;
+                        }
                     }
                 }
 
                 // 6. Bottom Mini Live Preview + Quick Actions (Screenshot 2 bottom-left)
                 Rectangle {
-                    height: 82px;
+                    height: 72px;
                     background: ShadTheme.bg-bar;
                     Rectangle { y: 0px; height: 1px; background: ShadTheme.border; }
 
                     HorizontalLayout {
-                        padding: 6px;
-                        spacing: 6px;
+                        padding: 5px;
+                        spacing: 5px;
 
                         // Action icons 2x2
                         VerticalLayout {
-                            spacing: 4px;
+                            spacing: 3px;
                             alignment: center;
                             HorizontalLayout {
-                                spacing: 4px;
+                                spacing: 3px;
                                 ShadIconButton {
                                     icon: "play";
+                                    box-size: 24px;
                                     active: true;
                                     clicked => { root.select-verse-and-project(root.active-verse); }
                                 }
                                 ShadIconButton {
                                     icon: "heart";
+                                    box-size: 24px;
                                     clicked => { root.favorite-active-verse(); }
                                 }
                             }
                             HorizontalLayout {
-                                spacing: 4px;
+                                spacing: 3px;
                                 ShadIconButton {
                                     icon: "plus";
+                                    box-size: 24px;
                                     clicked => { root.add-active-verse-to-service(); }
                                 }
                                 ShadIconButton {
                                     icon: "search";
+                                    box-size: 24px;
                                     clicked => {
-                                        root.right-submode = root.right-submode == 3 ? 0 : 3;
                                         bible-search-box.focus-input();
                                     }
                                 }
@@ -281,20 +322,23 @@ export component HolyricsBibleView inherits Rectangle {
                         }
 
                         // Mini 16:9 Live Preview
-                        Rectangle {
-                            width: 120px;
-                            height: 68px;
-                            border-radius: 4px;
-                            border-width: 1px;
-                            border-color: ShadTheme.border-strong;
-                            background: #000000;
-                            clip: true;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 96px;
+                                height: 54px;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: ShadTheme.border-strong;
+                                background: #000000;
+                                clip: true;
 
-                            Image {
-                                width: 100%;
-                                height: 100%;
-                                image-fit: contain;
-                                source: root.live-preview-image;
+                                Image {
+                                    width: 100%;
+                                    height: 100%;
+                                    image-fit: contain;
+                                    source: root.live-preview-image;
+                                }
                             }
                         }
 
@@ -327,7 +371,7 @@ export component HolyricsBibleView inherits Rectangle {
                 mouse-cursor: col-resize;
                 moved => {
                     if (self.pressed) {
-                        left-col-width = clamp(left-col-width + (self.mouse-x - self.pressed-x), 240px, 480px);
+                        left-col-width = clamp(left-col-width + (self.mouse-x - self.pressed-x), 220px, 460px);
                     }
                 }
             }
@@ -343,16 +387,15 @@ export component HolyricsBibleView inherits Rectangle {
 
                 // Top Header Bar (Favoritos | Histórico | Instant Reference/Text Search)
                 Rectangle {
-                    height: 38px;
+                    height: 36px;
                     background: ShadTheme.bg-bar;
                     HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        spacing: 8px;
-                        alignment: space-between;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 6px;
 
                         HorizontalLayout {
-                            spacing: 6px;
+                            spacing: 4px;
                             VerticalLayout {
                                 alignment: center;
                                 ShadButton {
@@ -389,20 +432,20 @@ export component HolyricsBibleView inherits Rectangle {
                         }
 
                         VerticalLayout {
+                            horizontal-stretch: 1;
                             alignment: center;
                             bible-search-box := ShadInput {
-                                width: 320px;
                                 leading-icon: "search";
-                                placeholder: "Buscar referência (Sl 23:1) ou texto...";
+                                placeholder: "Digite livro + cap + vers (ex: jo 3 16, sl 23 1) ou texto...";
                                 kbd-hint: "Enter";
+                                focus-seq: root.search-focus-seq;
+                                append-focus-seq: root.search-append-seq;
                                 text <=> root.search-query;
                                 edited(q) => {
-                                    root.right-submode = q == "" ? 0 : 3;
                                     root.search-edited(q);
                                 }
                                 accepted(q) => {
-                                    root.right-submode = q == "" ? 0 : 3;
-                                    root.search-edited(q);
+                                    root.search-accepted(q);
                                 }
                             }
                         }
@@ -619,16 +662,19 @@ export component HolyricsBibleView inherits Rectangle {
                     Text {
                         width: 100%;
                         height: 100%;
-                        text: "Clique no Livro → Capítulo → Versículo para projetar ao vivo • Use ← / → para avançar versículos";
-                        font-size: 10.5px;
-                        color: ShadTheme.fg-subtle;
+                        text: root.search-query != "" ?
+                              ("Localizando: \"" + root.search-query + "\" — pressione Enter para projetar ao vivo") :
+                              "Digite uma tecla para localizar rapidamente o versículo (ex: jo 3 16, sl 23 1, 1sm 17 45) • ← / → avança versículo";
+                        font-size: 10px;
+                        color: root.search-query != "" ? ShadTheme.live-blue-bright : ShadTheme.fg-subtle;
                         horizontal-alignment: center;
                         vertical-alignment: center;
+                        overflow: elide;
                     }
                 }
             }
         }
     }
 
-    property <length> left-col-width: 320px;
+    property <length> left-col-width: 265px;
 }

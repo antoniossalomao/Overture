@@ -61,8 +61,8 @@ component ModalShell inherits Rectangle {
     Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        width: min(root.modal-width, parent.width - 32px);
-        height: min(root.modal-height, parent.height - 32px);
+        width: min(root.modal-width, parent.width - 24px);
+        height: min(root.modal-height, parent.height - 24px);
         background: ShadTheme.bg;
         border-radius: ShadTheme.radius-lg;
         border-width: 1px;
@@ -88,6 +88,7 @@ component ModalShell inherits Rectangle {
                     alignment: space-between;
 
                     HorizontalLayout {
+                        horizontal-stretch: 1;
                         spacing: 10px;
                         Text {
                             text: root.title;
@@ -97,10 +98,12 @@ component ModalShell inherits Rectangle {
                             vertical-alignment: center;
                         }
                         if root.subtitle != "" : Text {
+                            horizontal-stretch: 1;
                             text: root.subtitle;
                             font-size: 11.5px;
                             color: ShadTheme.fg-subtle;
                             vertical-alignment: center;
+                            overflow: elide;
                         }
                     }
 
@@ -134,36 +137,42 @@ export component CountdownStudioModal inherits ModalShell {
     in-out property <string> text-after: "Para iniciar o culto";
     in-out property <bool> pad-zero: true;
     in-out property <bool> hide-zero-min: false;
-    in property <image> preview-bg-image;
+    in property <image> countdown-live-preview;
 
-    callback start-countdown(string, string, string, string, int); // mins, secs, before, after, mode
+    callback preview-changed(string, string, string, string, int, bool, bool);
+    callback start-countdown(string, string, string, string, int, bool, bool);
     callback add-countdown-to-service(string, string, string);
     callback stop-countdown();
 
+    function emit-preview() {
+        root.preview-changed(root.minutes, root.seconds, root.text-before, root.text-after, root.mode-idx, root.pad-zero, root.hide-zero-min);
+    }
+
     title: "Contagem regressiva";
     subtitle: "Sincronizada em tempo real na saída principal e palco";
-    modal-width: 940px;
-    modal-height: 560px;
+    modal-width: 920px;
+    modal-height: 540px;
 
     HorizontalLayout {
-        padding: 14px;
-        spacing: 14px;
+        padding: 12px;
+        spacing: 12px;
 
         // Left Config Column (Screenshot 3 left pane)
         Rectangle {
-            width: 265px;
+            width: 260px;
             background: ShadTheme.panel;
             border-radius: ShadTheme.radius-md;
             border-width: 1px;
             border-color: ShadTheme.border;
 
             VerticalLayout {
-                padding: 12px;
-                spacing: 10px;
+                padding: 10px;
+                spacing: 8px;
 
                 ShadTabStrip {
                     tabs: ["Determinar tempo", "Hora exata"];
                     active-index <=> root.mode-idx;
+                    changed => { root.emit-preview(); }
                 }
 
                 // Minutos : Segundos
@@ -173,35 +182,35 @@ export component CountdownStudioModal inherits ModalShell {
                     VerticalLayout {
                         spacing: 3px;
                         Text { text: root.mode-idx == 0 ? "Minutos" : "Hora (0-23)"; font-size: 10.5px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
-                        ShadInput { width: 84px; text <=> root.minutes; placeholder: "10"; }
+                        ShadInput { width: 84px; text <=> root.minutes; placeholder: "10"; edited => { root.emit-preview(); } }
                     }
                     VerticalLayout {
                         alignment: end;
-                        Text { text: ":"; font-size: 18px; font-weight: 700; color: ShadTheme.fg; height: 30px; vertical-alignment: center; }
+                        Text { text: ":"; font-size: 18px; font-weight: 700; color: ShadTheme.fg; height: 28px; vertical-alignment: center; }
                     }
                     VerticalLayout {
                         spacing: 3px;
                         Text { text: root.mode-idx == 0 ? "Segundos" : "Minuto (0-59)"; font-size: 10.5px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
-                        ShadInput { width: 84px; text <=> root.seconds; placeholder: "00"; }
+                        ShadInput { width: 84px; text <=> root.seconds; placeholder: "00"; edited => { root.emit-preview(); } }
                     }
                 }
 
                 VerticalLayout {
-                    spacing: 4px;
-                    Text { text: "Texto antes"; font-size: 11px; color: ShadTheme.fg-muted; }
-                    ShadTextarea { height: 54px; text <=> root.text-before; placeholder: "Opcional (acima do relógio)..."; }
+                    spacing: 3px;
+                    Text { height: 15px; text: "Texto antes"; font-size: 11px; color: ShadTheme.fg-muted; vertical-alignment: center; }
+                    ShadTextarea { height: 48px; text <=> root.text-before; placeholder: "Opcional (acima do relógio)..."; edited => { root.emit-preview(); } }
                 }
 
                 VerticalLayout {
-                    spacing: 6px;
-                    ShadCheckbox { label: "Preencher zero à esquerda"; checked <=> root.pad-zero; }
-                    ShadCheckbox { label: "Ocultar minuto zero"; checked <=> root.hide-zero-min; }
+                    spacing: 5px;
+                    ShadCheckbox { label: "Preencher zero à esquerda"; checked <=> root.pad-zero; toggled => { root.emit-preview(); } }
+                    ShadCheckbox { label: "Ocultar minuto zero"; checked <=> root.hide-zero-min; toggled => { root.emit-preview(); } }
                 }
 
                 VerticalLayout {
-                    spacing: 4px;
-                    Text { text: "Texto depois"; font-size: 11px; color: ShadTheme.fg-muted; }
-                    ShadTextarea { height: 64px; text <=> root.text-after; placeholder: "Para iniciar o culto"; }
+                    spacing: 3px;
+                    Text { height: 15px; text: "Texto depois"; font-size: 11px; color: ShadTheme.fg-muted; vertical-alignment: center; }
+                    ShadTextarea { height: 56px; text <=> root.text-after; placeholder: "Para iniciar o culto"; edited => { root.emit-preview(); } }
                 }
 
                 Rectangle { vertical-stretch: 1; }
@@ -214,7 +223,7 @@ export component CountdownStudioModal inherits ModalShell {
                         label: "Apresentar";
                         variant: "default";
                         clicked => {
-                            root.start-countdown(root.minutes, root.seconds, root.text-before, root.text-after, root.mode-idx);
+                            root.start-countdown(root.minutes, root.seconds, root.text-before, root.text-after, root.mode-idx, root.pad-zero, root.hide-zero-min);
                             root.close();
                         }
                     }
@@ -237,7 +246,7 @@ export component CountdownStudioModal inherits ModalShell {
             }
         }
 
-        // Right Large 16:9 Live Preview (Screenshot 3 right pane)
+        // Right Large 16:9 Live Compositor Preview (Screenshot 3 right pane)
         Rectangle {
             horizontal-stretch: 1;
             background: #050507;
@@ -249,40 +258,8 @@ export component CountdownStudioModal inherits ModalShell {
             Image {
                 width: 100%;
                 height: 100%;
-                image-fit: cover;
-                opacity: 0.45;
-                source: root.preview-bg-image;
-            }
-
-            VerticalLayout {
-                alignment: center;
-                spacing: 14px;
-                padding: 24px;
-
-                if root.text-before != "" : Text {
-                    text: root.text-before;
-                    font-size: 26px;
-                    font-weight: 600;
-                    color: #e4e4e7;
-                    horizontal-alignment: center;
-                }
-
-                Text {
-                    text: (root.minutes == "" ? "00" : root.minutes) + ":" + (root.seconds == "" ? "00" : root.seconds);
-                    font-size: 92px;
-                    font-weight: 800;
-                    color: #ffffff;
-                    horizontal-alignment: center;
-                }
-
-                if root.text-after != "" : Text {
-                    text: root.text-after;
-                    font-size: 34px;
-                    font-weight: 700;
-                    color: #ffffff;
-                    horizontal-alignment: center;
-                    wrap: word-wrap;
-                }
+                image-fit: contain;
+                source: root.countdown-live-preview;
             }
         }
     }
@@ -304,8 +281,8 @@ export component SongEditorStudioModal inherits ModalShell {
 
     title: "Editor de Música";
     subtitle: "Divisão automática PT-BR (máx. 2 linhas, preservação de estrofes e preposições)";
-    modal-width: 960px;
-    modal-height: 620px;
+    modal-width: 940px;
+    modal-height: 556px;
 
     HorizontalLayout {
         padding: 14px;
@@ -467,8 +444,8 @@ export component ThemeStudioModal inherits ModalShell {
 
     title: "Estúdio de Temas";
     subtitle: "Tipografia, gradiente, sombra e fundos animados em vídeo / motion";
-    modal-width: 960px;
-    modal-height: 600px;
+    modal-width: 940px;
+    modal-height: 556px;
 
     HorizontalLayout {
         padding: 14px;
@@ -672,6 +649,7 @@ export component DisplaySettingsModal inherits ModalShell {
     in-out property <int> return-monitor-idx: 0;
     in property <[string]> return-theme-options: ["Retorno Palco (Alto Contraste)"];
     in-out property <int> return-theme-idx: 0;
+    in-out property <bool> windowed-output-mode: false;
     in property <string> latency-text: "—";
 
     callback refresh-monitors();
@@ -679,13 +657,13 @@ export component DisplaySettingsModal inherits ModalShell {
     callback close-all-outputs();
 
     title: "Configurações de Exibição (Multi-Monitor)";
-    subtitle: "Saída Principal Fullscreen, Tela de Palco e Monitor de Retorno independentes";
+    subtitle: "Saída Principal, Tela de Palco e Monitor de Retorno independentes";
     modal-width: 640px;
-    modal-height: 460px;
+    modal-height: 480px;
 
     VerticalLayout {
         padding: 16px;
-        spacing: 12px;
+        spacing: 10px;
 
         Rectangle {
             background: ShadTheme.panel;
@@ -698,23 +676,28 @@ export component DisplaySettingsModal inherits ModalShell {
 
                 HorizontalLayout {
                     spacing: 12px;
-                    Text { width: 220px; text: "Saída Principal (Projetor / Telão)"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
+                    Text { width: 234px; text: "Saída Principal (Projetor / Telão)"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
                     ShadSelect { horizontal-stretch: 1; model: root.monitor-options; current-index <=> root.main-monitor-idx; }
                 }
                 HorizontalLayout {
                     spacing: 12px;
-                    Text { width: 220px; text: "Tela de Palco (Atual + Próximo + Relógio)"; font-size: 12px; color: ShadTheme.fg-secondary; vertical-alignment: center; }
+                    Text { width: 234px; text: "Tela de Palco (Atual + Próximo + Relógio)"; font-size: 12px; color: ShadTheme.fg-secondary; vertical-alignment: center; }
                     ShadSelect { horizontal-stretch: 1; model: root.monitor-options; current-index <=> root.stage-monitor-idx; }
                 }
                 HorizontalLayout {
                     spacing: 12px;
-                    Text { width: 220px; text: "Monitor de Retorno (Tema Próprio)"; font-size: 12px; color: ShadTheme.fg-secondary; vertical-alignment: center; }
+                    Text { width: 234px; text: "Monitor de Retorno (Tema Próprio)"; font-size: 12px; color: ShadTheme.fg-secondary; vertical-alignment: center; }
                     ShadSelect { horizontal-stretch: 1; model: root.monitor-options; current-index <=> root.return-monitor-idx; }
                 }
                 HorizontalLayout {
                     spacing: 12px;
                     Text { width: 220px; text: "Tema do Monitor de Retorno"; font-size: 12px; color: ShadTheme.fg-muted; vertical-alignment: center; }
                     ShadSelect { horizontal-stretch: 1; model: root.return-theme-options; current-index <=> root.return-theme-idx; }
+                }
+                Rectangle { height: 1px; background: ShadTheme.border-subtle; }
+                ShadSwitch {
+                    label: "Modo Janela Flutuante (ideal para testar em 1 monitor — Esc fecha saída)";
+                    checked <=> root.windowed-output-mode;
                 }
             }
         }
@@ -1120,7 +1103,7 @@ export component SettingsRemoteModal inherits ModalShell {
                 ShadButton { icon: "share"; label: "Exportar Pacote JSON..."; variant: "outline"; clicked => { root.trigger-export-json-dialog(); } }
 
                 Rectangle { vertical-stretch: 1; }
-                Text { text: "Overture v0.1.0 • Rust Puro • GPL-3.0"; font-size: 10.5px; color: ShadTheme.fg-subtle; horizontal-alignment: center; }
+                Text { text: "Overture v0.1.1 • 100% Rust Puro (Skia + wgpu DX12) • GPL-3.0"; font-size: 10.5px; color: ShadTheme.fg-subtle; horizontal-alignment: center; }
             }
         }
     }

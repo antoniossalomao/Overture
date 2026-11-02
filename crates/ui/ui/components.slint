@@ -1,5 +1,5 @@
 // Genuine shadcn/ui Component Kit built from GPU primitives in 100% Pure Slint
-import { ShadTheme } from "theme.slint";
+import { ShadTheme, UiFocus } from "theme.slint";
 import { LucideIcon } from "icons.slint";
 
 export component ShadBadge inherits Rectangle {
@@ -100,7 +100,9 @@ export component ShadIconButton inherits Rectangle {
     in property <string> icon: "play";
     in property <bool> active: false;
     in property <bool> danger: false;
+    in property <bool> subtle: false;
     in property <length> box-size: 26px;
+    in property <length> icon-px: 13px;
     callback clicked();
 
     width: root.box-size;
@@ -117,10 +119,11 @@ export component ShadIconButton inherits Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         name: root.icon;
-        icon-size: 14px;
+        icon-size: root.icon-px;
         tint: root.active ? #ffffff :
               root.danger && ta.has-hover ? #fca5a5 :
-              ta.has-hover ? ShadTheme.fg : ShadTheme.fg-muted;
+              ta.has-hover ? ShadTheme.fg :
+              root.subtle ? ShadTheme.fg-subtle : ShadTheme.fg-muted;
     }
 
     ta := TouchArea {
@@ -134,9 +137,16 @@ export component ShadInput inherits Rectangle {
     in property <string> placeholder: "";
     in property <string> leading-icon: "";
     in property <string> kbd-hint: "";
+    in property <bool> show-clear: leading-icon == "search";
     in property <int> focus-seq: 0;
+    in property <int> append-focus-seq: 0;
     callback edited(string);
     callback accepted(string);
+
+    property <bool> tracked-focus: ti.has-focus;
+    changed tracked-focus => {
+        UiFocus.active-inputs = max(0, UiFocus.active-inputs + (self.tracked-focus ? 1 : -1));
+    }
 
     changed focus-seq => {
         if (root.focus-seq > 0) {
@@ -145,49 +155,65 @@ export component ShadInput inherits Rectangle {
         }
     }
 
+    changed append-focus-seq => {
+        if (root.append-focus-seq > 0) {
+            ti.focus();
+            ti.set-selection-offsets(10000, 10000);
+        }
+    }
+
     public function focus-input() {
         ti.focus();
         ti.select-all();
     }
 
-    height: 30px;
+    public function focus-end() {
+        ti.focus();
+        ti.set-selection-offsets(10000, 10000);
+    }
+
+    height: 28px;
     border-radius: ShadTheme.radius-sm;
     border-width: 1px;
-    border-color: ti.has-focus ? ShadTheme.ring : ShadTheme.border;
+    border-color: ti.has-focus ? ShadTheme.live-blue-bright : ShadTheme.border;
     background: ShadTheme.bg;
     animate border-color { duration: 120ms; }
 
     HorizontalLayout {
+        height: 100%;
         padding-left: 8px;
-        padding-right: 8px;
-        spacing: 6px;
+        padding-right: 6px;
+        spacing: 5px;
 
         if root.leading-icon != "" : VerticalLayout {
             alignment: center;
             LucideIcon {
                 name: root.leading-icon;
                 icon-size: 13px;
-                tint: ti.has-focus ? ShadTheme.fg-secondary : ShadTheme.fg-subtle;
+                tint: ti.has-focus ? ShadTheme.live-blue-bright : ShadTheme.fg-subtle;
             }
         }
 
         Rectangle {
             horizontal-stretch: 1;
+            height: 100%;
             clip: true;
 
             if root.text == "" : Text {
                 x: 0px;
+                y: 0px;
                 width: 100%;
                 height: 100%;
                 text: root.placeholder;
                 color: ShadTheme.fg-subtle;
-                font-size: 12px;
+                font-size: 11.5px;
                 vertical-alignment: center;
                 overflow: elide;
             }
 
             ti := TextInput {
                 x: 0px;
+                y: 0px;
                 width: 100%;
                 height: 100%;
                 text <=> root.text;
@@ -202,11 +228,12 @@ export component ShadInput inherits Rectangle {
             }
         }
 
-        if root.text != "" : VerticalLayout {
+        if root.show-clear && root.text != "" : VerticalLayout {
             alignment: center;
             ShadIconButton {
                 icon: "x";
                 box-size: 18px;
+                icon-px: 11px;
                 clicked => {
                     root.text = "";
                     root.edited("");
@@ -217,7 +244,7 @@ export component ShadInput inherits Rectangle {
         if root.text == "" && root.kbd-hint != "" : VerticalLayout {
             alignment: center;
             Rectangle {
-                height: 18px;
+                height: 17px;
                 border-radius: 3px;
                 border-width: 1px;
                 border-color: ShadTheme.border;
@@ -227,7 +254,7 @@ export component ShadInput inherits Rectangle {
                     padding-right: 5px;
                     Text {
                         text: root.kbd-hint;
-                        font-size: 10px;
+                        font-size: 9.5px;
                         color: ShadTheme.fg-subtle;
                         vertical-alignment: center;
                     }
@@ -242,9 +269,14 @@ export component ShadTextarea inherits Rectangle {
     in property <string> placeholder: "";
     callback edited(string);
 
+    property <bool> tracked-focus: ti.has-focus;
+    changed tracked-focus => {
+        UiFocus.active-inputs = max(0, UiFocus.active-inputs + (self.tracked-focus ? 1 : -1));
+    }
+
     border-radius: ShadTheme.radius-md;
     border-width: 1px;
-    border-color: ti.has-focus ? ShadTheme.ring : ShadTheme.border;
+    border-color: ti.has-focus ? ShadTheme.live-blue-bright : ShadTheme.border;
     background: ShadTheme.bg;
     clip: true;
 
@@ -262,6 +294,7 @@ export component ShadTextarea inherits Rectangle {
             text: root.placeholder;
             color: ShadTheme.fg-subtle;
             font-size: 12px;
+            wrap: word-wrap;
         }
 
         ti := TextInput {
@@ -318,11 +351,21 @@ export component ShadSwitch inherits HorizontalLayout {
         }
     }
 
-    if root.label != "" : Text {
-        text: root.label;
-        font-size: 11px;
-        color: ShadTheme.fg-muted;
-        vertical-alignment: center;
+    if root.label != "" : VerticalLayout {
+        alignment: center;
+        Text {
+            text: root.label;
+            font-size: 11px;
+            color: ShadTheme.fg-muted;
+            vertical-alignment: center;
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.checked = !root.checked;
+                    root.toggled(root.checked);
+                }
+            }
+        }
     }
 }
 
@@ -361,16 +404,19 @@ export component ShadCheckbox inherits HorizontalLayout {
         }
     }
 
-    if root.label != "" : Text {
-        text: root.label;
-        font-size: 11.5px;
-        color: ShadTheme.fg-secondary;
-        vertical-alignment: center;
-        TouchArea {
-            mouse-cursor: pointer;
-            clicked => {
-                root.checked = !root.checked;
-                root.toggled(root.checked);
+    if root.label != "" : VerticalLayout {
+        alignment: center;
+        Text {
+            text: root.label;
+            font-size: 11.5px;
+            color: ShadTheme.fg-secondary;
+            vertical-alignment: center;
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.checked = !root.checked;
+                    root.toggled(root.checked);
+                }
             }
         }
     }
@@ -463,8 +509,11 @@ export component ShadSelect inherits Rectangle {
         x: 0px;
         y: root.height + 3px;
         width: max(root.width, 190px);
+        height: pop-vbox.preferred-height + 2px;
 
         Rectangle {
+            width: 100%;
+            height: 100%;
             background: ShadTheme.popover;
             border-radius: ShadTheme.radius-md;
             border-width: 1px;
@@ -472,7 +521,7 @@ export component ShadSelect inherits Rectangle {
             drop-shadow-blur: 16px;
             drop-shadow-color: #000000aa;
 
-            VerticalLayout {
+            pop-vbox := VerticalLayout {
                 padding: 4px;
                 spacing: 1px;
                 for item[idx] in root.model : Rectangle {
@@ -532,6 +581,14 @@ export component ShadScrollArea inherits Rectangle {
     in property <length> content-height: 100px;
     background: transparent;
     clip: true;
+
+    public function scroll-to-ratio(ratio: float) {
+        if (root.content-height > root.height) {
+            flick.content-y = -clamp(ratio, 0.0, 1.0) * (root.content-height - root.height);
+        } else {
+            flick.content-y = 0px;
+        }
+    }
 
     flick := Flickable {
         width: 100%;
