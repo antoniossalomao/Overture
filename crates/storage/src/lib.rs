@@ -3,6 +3,7 @@
 pub mod accent;
 pub mod backup;
 pub mod bible_seed;
+pub mod service_resolver;
 
 pub use accent::{canonical_lyrics_key, fold_search_text};
 pub use backup::{BackupManifest, create_full_backup, restore_full_backup};
