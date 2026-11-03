@@ -123,13 +123,13 @@ component MenuActionRow inherits Rectangle {
         Text {
             horizontal-stretch: 1;
             text: root.label;
-            font-size: 11.5px;
+            font-size: 12px;
             color: ShadTheme.fg;
             vertical-alignment: center;
         }
         if root.shortcut != "" : Text {
             text: root.shortcut;
-            font-size: 10.5px;
+            font-size: 11px;
             color: ShadTheme.fg-subtle;
             vertical-alignment: center;
         }
@@ -148,6 +148,7 @@ export component MainWindow inherits Window {
     preferred-width: 1200px;
     preferred-height: 720px;
     background: ShadTheme.bg;
+    default-font-family: "Geist";
     icon: @image-url("../../../assets/overture-512.png");
 
     // ==================== STATE PROPERTIES ====================
@@ -756,7 +757,7 @@ export component MainWindow inherits Window {
                         alignment: center;
                         Text {
                             text: root.active-header-title + (root.active-header-subtitle != "" ? "  (" + root.active-header-subtitle + ")" : "");
-                            font-size: 13.5px;
+                            font-size: 14px;
                             font-weight: 600;
                             color: ShadTheme.fg;
                             vertical-alignment: center;
@@ -1094,7 +1095,7 @@ export component MainWindow inherits Window {
                                 alignment: space-between;
                                 Text {
                                     text: root.songs-list.length + " itens";
-                                    font-size: 10.5px;
+                                    font-size: 11px;
                                     color: ShadTheme.fg-subtle;
                                     vertical-alignment: center;
                                 }
@@ -1216,7 +1217,7 @@ export component MainWindow inherits Window {
                                 Text {
                                     horizontal-stretch: 1;
                                     text: "Histórico (" + root.song-history-rows.length + ")";
-                                    font-size: 10.5px;
+                                    font-size: 11px;
                                     font-weight: 500;
                                     color: ShadTheme.fg-muted;
                                     horizontal-alignment: center;
@@ -1354,7 +1355,7 @@ export component MainWindow inherits Window {
                                 Text {
                                     horizontal-stretch: 1;
                                     text: "wgpu DX12";
-                                    font-size: 10.5px;
+                                    font-size: 11px;
                                     color: ShadTheme.fg-muted;
                                     vertical-alignment: center;
                                     overflow: elide;
@@ -1645,7 +1646,7 @@ export component MainWindow inherits Window {
                                             }
                                             Text {
                                                 text: pl.subtitle != "" ? pl.subtitle : pl.kind-badge;
-                                                font-size: 9.5px;
+                                                font-size: 11px;
                                                 color: ShadTheme.fg-muted;
                                                 horizontal-alignment: center;
                                                 overflow: elide;
@@ -1724,7 +1725,7 @@ export component MainWindow inherits Window {
                                         Text {
                                             x: 2px; width: parent.width - 4px; height: 100%;
                                             text: th.name;
-                                            font-size: 8.5px;
+                                            font-size: 11px;
                                             color: #ffffff;
                                             horizontal-alignment: center;
                                             vertical-alignment: center;
@@ -1786,7 +1787,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         text: "Overture v0.1.1 • Rust Puro (Skia + DirectX 12)";
-                        font-size: 10px;
+                        font-size: 11px;
                         color: ShadTheme.fg-subtle;
                         vertical-alignment: center;
                     }
@@ -1794,8 +1795,8 @@ export component MainWindow inherits Window {
                     Text {
                         horizontal-stretch: 1;
                         text: root.status-banner;
-                        font-size: 10.5px;
-                        color: #7dd3fc;
+                        font-size: 11px;
+                        color: #b9c6ea;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                         overflow: elide;
@@ -1803,7 +1804,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         text: "Saída GPU: " + root.output-latency-text;
-                        font-size: 10px;
+                        font-size: 11px;
                         color: ShadTheme.fg-subtle;
                         vertical-alignment: center;
                     }

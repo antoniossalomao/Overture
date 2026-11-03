@@ -92,7 +92,7 @@ component ModalShell inherits Rectangle {
                         spacing: 10px;
                         Text {
                             text: root.title;
-                            font-size: 13.5px;
+                            font-size: 14px;
                             font-weight: 600;
                             color: ShadTheme.fg;
                             vertical-alignment: center;
@@ -100,7 +100,7 @@ component ModalShell inherits Rectangle {
                         if root.subtitle != "" : Text {
                             horizontal-stretch: 1;
                             text: root.subtitle;
-                            font-size: 11.5px;
+                            font-size: 12px;
                             color: ShadTheme.fg-subtle;
                             vertical-alignment: center;
                             overflow: elide;
@@ -181,7 +181,7 @@ export component CountdownStudioModal inherits ModalShell {
                     alignment: center;
                     VerticalLayout {
                         spacing: 3px;
-                        Text { text: root.mode-idx == 0 ? "Minutos" : "Hora (0-23)"; font-size: 10.5px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
+                        Text { text: root.mode-idx == 0 ? "Minutos" : "Hora (0-23)"; font-size: 11px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
                         ShadInput { width: 84px; text <=> root.minutes; placeholder: "10"; edited => { root.emit-preview(); } }
                     }
                     VerticalLayout {
@@ -190,7 +190,7 @@ export component CountdownStudioModal inherits ModalShell {
                     }
                     VerticalLayout {
                         spacing: 3px;
-                        Text { text: root.mode-idx == 0 ? "Segundos" : "Minuto (0-59)"; font-size: 10.5px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
+                        Text { text: root.mode-idx == 0 ? "Segundos" : "Minuto (0-59)"; font-size: 11px; color: ShadTheme.fg-muted; horizontal-alignment: center; }
                         ShadInput { width: 84px; text <=> root.seconds; placeholder: "00"; edited => { root.emit-preview(); } }
                     }
                 }
@@ -249,7 +249,7 @@ export component CountdownStudioModal inherits ModalShell {
         // Right Large 16:9 Live Compositor Preview (Screenshot 3 right pane)
         Rectangle {
             horizontal-stretch: 1;
-            background: #050507;
+            background: #0b0c0e;
             border-radius: ShadTheme.radius-md;
             border-width: 1px;
             border-color: ShadTheme.border-strong;
@@ -402,7 +402,7 @@ export component SongEditorStudioModal inherits ModalShell {
                                 spacing: 4px;
                                 HorizontalLayout {
                                     alignment: space-between;
-                                    Text { text: "Slide " + sc.number-label; font-size: 10px; font-weight: 600; color: ShadTheme.fg-subtle; }
+                                    Text { text: "Slide " + sc.number-label; font-size: 11px; font-weight: 600; color: ShadTheme.fg-subtle; }
                                     if sc.forced-break : ShadBadge { text: "quebra_forcada"; variant: "amber"; }
                                 }
                                 Text {
@@ -498,8 +498,8 @@ export component ThemeStudioModal inherits ModalShell {
                                 VerticalLayout {
                                     horizontal-stretch: 1;
                                     alignment: center;
-                                    Text { text: tr.name; font-size: 11.5px; font-weight: 600; color: ShadTheme.fg; overflow: elide; }
-                                    Text { text: tr.summary; font-size: 9.5px; color: ShadTheme.fg-muted; overflow: elide; }
+                                    Text { text: tr.name; font-size: 12px; font-weight: 600; color: ShadTheme.fg; overflow: elide; }
+                                    Text { text: tr.summary; font-size: 11px; color: ShadTheme.fg-muted; overflow: elide; }
                                 }
                             }
                             trta := TouchArea {
@@ -627,7 +627,7 @@ export component ThemeStudioModal inherits ModalShell {
             horizontal-stretch: 1;
             alignment: center;
             spacing: 8px;
-            Text { text: "Pré-visualização em Tempo Real (Compositor GPU)"; font-size: 11.5px; color: ShadTheme.fg-muted; }
+            Text { text: "Pré-visualização em Tempo Real (Compositor GPU)"; font-size: 12px; color: ShadTheme.fg-muted; }
             Rectangle {
                 height: 230px;
                 background: #000000;
@@ -797,7 +797,7 @@ export component ScoreboardAlertModal inherits ModalShell {
                 spacing: 12px;
                 HorizontalLayout {
                     alignment: space-between;
-                    Text { text: "Placar Manual na Saída Principal"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; }
+                    Text { text: "Placar Manual na Saída Principal"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
                     ShadSwitch {
                         label: "Exibir Placar no Projetor";
                         checked <=> root.scoreboard-visible;
@@ -885,7 +885,7 @@ export component ScheduleReportsModal inherits ModalShell {
             VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
-                Text { text: "Escala do Culto Atual"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; }
+                Text { text: "Escala do Culto Atual"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
                 HorizontalLayout {
                     spacing: 6px;
                     ShadInput { horizontal-stretch: 1; text <=> root.member-input; placeholder: "Nome do integrante..."; }
@@ -938,7 +938,7 @@ export component ScheduleReportsModal inherits ModalShell {
                 spacing: 8px;
                 HorizontalLayout {
                     alignment: space-between;
-                    Text { text: "Músicas Mais Tocadas"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
+                    Text { text: "Músicas Mais Tocadas"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
                     ShadSelect {
                         width: 155px;
                         model: root.weekday-options;
@@ -1058,10 +1058,10 @@ export component SettingsRemoteModal inherits ModalShell {
                     Text { text: "Atalhos de Teclado"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
                     HorizontalLayout {
                         spacing: 8px;
-                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Anterior"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-prev; } }
-                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Próximo"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-next; } }
-                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Tela Preta"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-black; } }
-                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Modo Logo"; font-size: 10px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-logo; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Anterior"; font-size: 11px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-prev; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Próximo"; font-size: 11px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-next; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Tela Preta"; font-size: 11px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-black; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; Text { text: "Modo Logo"; font-size: 11px; color: ShadTheme.fg-muted; } ShadInput { text <=> root.shortcut-logo; } }
                     }
                 }
             }
@@ -1085,7 +1085,7 @@ export component SettingsRemoteModal inherits ModalShell {
             VerticalLayout {
                 padding: 14px;
                 spacing: 10px;
-                Text { text: "Backup Completo & Exportação"; font-size: 12.5px; font-weight: 600; color: ShadTheme.fg; }
+                Text { text: "Backup Completo & Exportação"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; }
                 Text {
                     text: "O backup completo (.zip) gera um snapshot consistente do banco SQLite (VACUUM INTO) junto com todos os arquivos da pasta de mídias.";
                     font-size: 11px;
@@ -1103,7 +1103,7 @@ export component SettingsRemoteModal inherits ModalShell {
                 ShadButton { icon: "share"; label: "Exportar Pacote JSON..."; variant: "outline"; clicked => { root.trigger-export-json-dialog(); } }
 
                 Rectangle { vertical-stretch: 1; }
-                Text { text: "Overture v0.1.1 • 100% Rust Puro (Skia + wgpu DX12) • GPL-3.0"; font-size: 10.5px; color: ShadTheme.fg-subtle; horizontal-alignment: center; }
+                Text { text: "Overture v0.1.1 • 100% Rust Puro (Skia + wgpu DX12) • GPL-3.0"; font-size: 11px; color: ShadTheme.fg-subtle; horizontal-alignment: center; }
             }
         }
     }
