@@ -485,6 +485,10 @@ impl StateEngine {
                 }
                 CoreCommand::TickSecond => {
                     changed = false;
+                    // Relógio na saída: redesenha a cada segundo quando ativo.
+                    if st.main_theme.show_clock {
+                        changed = true;
+                    }
                     if st.countdown.active {
                         if st.countdown.remaining_secs > 0 {
                             st.countdown.remaining_secs -= 1;

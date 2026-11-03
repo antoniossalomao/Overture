@@ -491,6 +491,39 @@ impl SlideCompositor {
             }
         }
 
+        // Relógio (HH:MM) no canto superior direito da saída principal
+        if theme.show_clock && !is_return_monitor {
+            let now = chrono::Local::now().format("%H:%M").to_string();
+            let px = (44.0 * scale).max(14.0);
+            let box_w = ((frame.width as f32) * 0.22).round().max(60.0) as u32;
+            let box_x = frame.width as i32 - box_w as i32 - (36.0 * scale) as i32;
+            self.draw_text_block(
+                &mut frame,
+                TextBlockSpec {
+                    text: &now,
+                    font_family: &theme.font_family,
+                    font_size_px: px,
+                    line_height_px: px * 1.2,
+                    bold: true,
+                    italic: false,
+                    glow: overture_core::GlowSpec::OFF,
+                    color: RgbaColor::new(255, 255, 255, 220),
+                    h_align: HorizontalAlign::Right,
+                    v_align: VerticalAlign::Top,
+                    shadow: ShadowSpec {
+                        enabled: true,
+                        color: RgbaColor::new(0, 0, 0, 200),
+                        offset_x: 2.0 * scale,
+                        offset_y: 2.0 * scale,
+                    },
+                    box_x,
+                    box_y: (28.0 * scale) as i32,
+                    box_w,
+                    box_h: (px * 1.4) as u32,
+                },
+            );
+        }
+
         // Manual Scoreboard overlay
         if state.scoreboard.visible {
             self.draw_scoreboard_overlay(&mut frame, state, &theme.font_family, scale);

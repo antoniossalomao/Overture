@@ -174,6 +174,8 @@ pub struct ThemeConfig {
     pub italic: bool,
     /// Brilho ao redor do texto.
     pub glow: GlowSpec,
+    /// Mostra o relógio (HH:MM) no canto superior direito da saída principal.
+    pub show_clock: bool,
 }
 
 impl Default for ThemeConfig {
@@ -193,6 +195,7 @@ impl Default for ThemeConfig {
             transition: TransitionKind::Fade { duration_ms: 180 },
             italic: false,
             glow: GlowSpec::OFF,
+            show_clock: false,
         }
     }
 }
@@ -217,6 +220,7 @@ impl ThemeConfig {
             transition: TransitionKind::Fade { duration_ms: 180 },
             italic: false,
             glow: GlowSpec::OFF,
+            show_clock: false,
         }
     }
 
@@ -243,6 +247,7 @@ impl ThemeConfig {
             transition: TransitionKind::None,
             italic: false,
             glow: GlowSpec::OFF,
+            show_clock: false,
         }
     }
 }
