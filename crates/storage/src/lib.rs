@@ -506,7 +506,8 @@ impl Storage {
             for _ in &tokens {
                 sql.push_str(" AND search_blob LIKE ?");
             }
-            sql.push_str(" ORDER BY title COLLATE NOCASE ASC LIMIT ?");
+            // Relevância: título que contém o primeiro termo vem antes; depois, por título.
+            sql.push_str(" ORDER BY CASE WHEN lower(title) LIKE ? THEN 0 ELSE 1 END, title COLLATE NOCASE ASC LIMIT ?");
 
             let mut q = sqlx::query(&sql)
                 .bind(include_archived as i32)
@@ -515,6 +516,7 @@ impl Storage {
             for tok in &tokens {
                 q = q.bind(format!("%{tok}%"));
             }
+            q = q.bind(format!("%{}%", tokens[0]));
             q = q.bind(limit);
             q.fetch_all(&self.pool).await?
         };

@@ -345,6 +345,7 @@ export component MainWindow inherits Window {
     callback search-songs(string);
     callback search-songs-accepted(string);
     callback toggle-show-archived(bool);
+    callback library-step(int);      // Alt+↑/↓: move a seleção na biblioteca
     callback song-select(int);       // Loads song into Col 2 (and records in session history)
     callback song-project-now(int);  // Loads & projects slide 0 immediately
     callback song-add-to-service(int);
@@ -457,6 +458,20 @@ export component MainWindow inherits Window {
                 if (event.text == Key.LeftArrow || event.text == Key.UpArrow || event.text == Key.PageUp) {
                     root.prev-slide();
                     return accept;
+                }
+                if (root.workspace-mode == 0 && root.left-lib-tab == 0) {
+                    if (event.text == Key.Return && root.selected-song-id > 0) {
+                        root.song-project-now(root.selected-song-id);
+                        return accept;
+                    }
+                    if (event.modifiers.alt && event.text == Key.UpArrow) {
+                        root.library-step(-1);
+                        return accept;
+                    }
+                    if (event.modifiers.alt && event.text == Key.DownArrow) {
+                        root.library-step(1);
+                        return accept;
+                    }
                 }
                 if (root.workspace-mode == 1) {
                     if (event.text == Key.Return) {

@@ -639,6 +639,31 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_library_step(move |delta| {
+            use slint::Model;
+            let mut c = ctx.borrow_mut();
+            let Some(w) = ui_weak.upgrade() else {
+                return;
+            };
+            let model = w.get_songs_list();
+            let ids: Vec<i32> = (0..model.row_count())
+                .filter_map(|i| model.row_data(i).map(|r| r.song_id))
+                .collect();
+            if ids.is_empty() {
+                return;
+            }
+            let current = w.get_selected_song_id();
+            let pos = ids.iter().position(|id| *id == current).map(|p| p as i32).unwrap_or(-1);
+            let next = (pos + delta).clamp(0, ids.len() as i32 - 1) as usize;
+            let song_id = ids[next];
+            if let Ok(Some(song)) = c.rt.block_on(c.storage.get_song(song_id as i64)) {
+                stage_and_optionally_project_song(&w, &mut c, song, false, 0);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_song_select(move |song_id| {
             let mut c = ctx.borrow_mut();
             if let (Some(w), Ok(Some(song))) = (
@@ -1392,12 +1417,20 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             if dst < 0 || dst >= len || dst == row_idx {
                 return;
             }
+            // Move em passos de vizinho em vizinho: o item é inserido na nova posição.
+            let step = if dst > row_idx { 1 } else { -1 };
+            let steps = (dst - row_idx).abs();
+            let mut apply_swaps = |items: &mut Vec<overture_core::ServiceItem>| {
+                let mut cur = row_idx;
+                for _ in 0..steps {
+                    items.swap(cur as usize, (cur + step) as usize);
+                    cur += step;
+                }
+            };
             if c.using_temp_service {
-                c.temp_service.items.swap(row_idx as usize, dst as usize);
+                apply_swaps(&mut c.temp_service.items);
             } else {
-                c.persistent_service
-                    .items
-                    .swap(row_idx as usize, dst as usize);
+                apply_swaps(&mut c.persistent_service.items);
                 let svc_id = c.persistent_service.id;
                 let items = c.persistent_service.items.clone();
                 if let Ok(saved) = c.rt.block_on(c.storage.replace_service_items(svc_id, &items)) {
