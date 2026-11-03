@@ -1,0 +1,63 @@
+name: Fundos de letra em vídeo
+
+# Gera os vídeos em loop dos fundos (crates/media/src/motion.rs) e publica como artefato.
+# Rode manualmente (Actions > Fundos de letra em vídeo > Run workflow) ou ao mudar os estilos.
+
+on:
+  workflow_dispatch:
+    inputs:
+      filtro:
+        description: "Só gerar estilos cujo nome contém este texto (vazio = todos)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - "crates/media/src/motion.rs"
+      - "crates/media/examples/export_motion.rs"
+      - ".github/workflows/motion-videos.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exportar:
+    name: Exportar vídeos (1920×1080, 30 fps, 24 s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar ffmpeg (com libx264)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -hide_banner -encoders | grep libx264
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Compilar exportador
+        run: cargo build --release -p overture-media --example export_motion
+
+      - name: Gerar vídeos
+        env:
+          FILTRO: ${{ github.event.inputs.filtro }}
+        run: |
+          mkdir -p dist/motion
+          ./target/release/examples/export_motion dist/motion "$FILTRO"
+
+      - name: Conferir saída
+        run: |
+          ls -la dist/motion
+          test -n "$(ls dist/motion/*.mp4 2>/dev/null)"
+          du -sh dist/motion
+
+      - name: Publicar pasta como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-videos
+          path: dist/motion/
+          retention-days: 30
+          if-no-files-found: error

@@ -1,5 +1,5 @@
 use crate::libmpv_ffi::{LibMpvPlayer, probe_libmpv_path};
-use crate::motion::{MotionPreset, generate_motion_frame};
+use crate::motion::{MotionPreset, generate_motion_frame, motion_video_path};
 use overture_core::MediaKind;
 use overture_render::SharedVideoFrame;
 use std::sync::mpsc::{self, Sender};
@@ -75,7 +75,29 @@ impl MediaEngine {
                                 loop_playback,
                             } => {
                                 paused = false;
-                                if path.starts_with("motion://") || mpv.is_none() {
+                                // Estilos `motion://` têm vídeo exportado (`assets/motion/<nome>.mp4`): tocar via
+                                // libmpv em loop, sem custo de geração em CPU. Sem o arquivo ou sem libmpv,
+                                // cai no gerador procedural.
+                                let motion_file = if path.starts_with("motion://") {
+                                    motion_video_path(&path)
+                                } else {
+                                    None
+                                };
+                                let played_video = match (&mut mpv, &motion_file) {
+                                    (Some(p), Some(file)) => match p.load_file(&file.to_string_lossy(), true, true) {
+                                        Ok(()) => {
+                                            active_mode = ActivePlayback::MpvVideo;
+                                            true
+                                        }
+                                        Err(e) => {
+                                            warn!("libmpv falhou em {}: {}; usando gerador", file.display(), e);
+                                            false
+                                        }
+                                    },
+                                    _ => false,
+                                };
+                                if played_video {
+                                } else if path.starts_with("motion://") || mpv.is_none() {
                                     if let Some(p) = &mut mpv {
                                         p.stop();
                                     }
