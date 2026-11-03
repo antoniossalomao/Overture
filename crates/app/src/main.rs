@@ -572,6 +572,17 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_toggle_auto_play_repeat(move |repeat| {
+            let mut c = ctx.borrow_mut();
+            c.engine.dispatch(CoreCommand::SetAutoPlayRepeat { repeat });
+            if let Some(w) = ui_weak.upgrade() {
+                sync_output_state_to_ui(&w, &mut c);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_toggle_auto_play(move |enabled| {
             let mut c = ctx.borrow_mut();
             let dur = c.settings.auto_advance_default_secs.or(Some(6));
@@ -2875,6 +2886,7 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
     ui.set_is_logo_screen(st.display_mode == DisplayMode::Logo);
     ui.set_is_clear_text(st.display_mode == DisplayMode::ClearText);
     ui.set_auto_play_enabled(st.auto_play_enabled);
+    ui.set_auto_play_repeat(st.auto_play_repeat);
     ui.set_stage_timer_display(st.formatted_stage_timer().into());
     ui.set_scoreboard_visible(st.scoreboard.visible);
     ui.set_team_a_score(st.scoreboard.team_a_score);

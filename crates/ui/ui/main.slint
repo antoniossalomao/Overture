@@ -191,6 +191,7 @@ export component MainWindow inherits Window {
     in-out property <bool> is-logo-screen: false;
     in-out property <bool> is-clear-text: false;
     in-out property <bool> auto-play-enabled: false;
+    in-out property <bool> auto-play-repeat: true;
 
     // Column 1: Library
     in-out property <int> left-lib-tab: 0; // 0 Letras, 1 Texto, 2 Áudio, 3 Vídeo, 4 Imagem
@@ -334,6 +335,7 @@ export component MainWindow inherits Window {
     callback toggle-clear-text();
     callback clear-output();
     callback toggle-auto-play(bool);
+    callback toggle-auto-play-repeat(bool);
 
     // Library & Songs
     callback search-songs(string);
@@ -1174,6 +1176,15 @@ export component MainWindow inherits Window {
                                     clicked => {
                                         root.auto-play-enabled = !root.auto-play-enabled;
                                         root.toggle-auto-play(root.auto-play-enabled);
+                                    }
+                                }
+                                ShadButton {
+                                    size: "xs";
+                                    label: root.auto-play-repeat ? "Repetir" : "Parar no fim";
+                                    variant: "secondary";
+                                    clicked => {
+                                        root.auto-play-repeat = !root.auto-play-repeat;
+                                        root.toggle-auto-play-repeat(root.auto-play-repeat);
                                     }
                                 }
                                 Rectangle { width: 1px; height: 14px; y: 10px; background: ShadTheme.border; }
