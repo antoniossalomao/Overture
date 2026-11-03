@@ -43,8 +43,6 @@ pub enum Engine {
     Orbs { count: u32, radius: f32 },
     /// Raios diagonais que varrem a tela.
     Rays { count: u32, width: f32 },
-    /// Anéis que se expandem a partir de centros fixos.
-    Rings { count: u32, thickness: f32 },
     /// Névoa de baixa frequência.
     Fog { scale: f32 },
     /// Grade de pontos que pulsam.
@@ -95,16 +93,11 @@ pub const STYLES: &[Style] = &[
     Style { uri: "motion://orbs-gold", name: "Orbes Âmbar", base: [12.0, 10.0, 7.0], tint: [120.0, 85.0, 30.0], tint2: [100.0, 60.0, 30.0], strength: 0.34, engine: Engine::Orbs { count: 5, radius: 0.24 } },
     Style { uri: "motion://orbs-mint", name: "Orbes Menta", base: [7.0, 12.0, 11.0], tint: [40.0, 120.0, 100.0], tint2: [50.0, 100.0, 130.0], strength: 0.36, engine: Engine::Orbs { count: 7, radius: 0.20 } },
     // --- Raios ---
-    Style { uri: "motion://rays-steel", name: "Raios de Aço", base: [9.0, 10.0, 13.0], tint: [120.0, 135.0, 165.0], tint2: [100.0, 115.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 10, width: 0.028 } },
-    Style { uri: "motion://rays-cyan", name: "Raios Ciano", base: [6.0, 11.0, 13.0], tint: [60.0, 170.0, 190.0], tint2: [50.0, 130.0, 170.0], strength: 0.34, engine: Engine::Rays { count: 8, width: 0.020 } },
-    Style { uri: "motion://rays-violet", name: "Raios Violetas", base: [10.0, 7.0, 14.0], tint: [110.0, 70.0, 170.0], tint2: [90.0, 60.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 12, width: 0.024 } },
-    Style { uri: "motion://rays-warm", name: "Raios Quentes", base: [12.0, 9.0, 7.0], tint: [150.0, 95.0, 45.0], tint2: [130.0, 80.0, 40.0], strength: 0.34, engine: Engine::Rays { count: 9, width: 0.030 } },
-    // --- Anéis ---
-    Style { uri: "motion://rings-teal", name: "Ondulações Azuis", base: [7.0, 11.0, 13.0], tint: [70.0, 150.0, 170.0], tint2: [60.0, 120.0, 150.0], strength: 0.40, engine: Engine::Rings { count: 4, thickness: 0.014 } },
-    Style { uri: "motion://rings-violet", name: "Ondulações Violetas", base: [10.0, 8.0, 14.0], tint: [120.0, 90.0, 170.0], tint2: [100.0, 70.0, 150.0], strength: 0.40, engine: Engine::Rings { count: 3, thickness: 0.012 } },
-    Style { uri: "motion://rings-silver", name: "Ondulações Prateadas", base: [9.0, 9.0, 10.0], tint: [170.0, 175.0, 190.0], tint2: [140.0, 145.0, 160.0], strength: 0.30, engine: Engine::Rings { count: 5, thickness: 0.010 } },
-    Style { uri: "motion://rings-ember", name: "Ondulações Brasa", base: [12.0, 8.0, 7.0], tint: [140.0, 80.0, 50.0], tint2: [120.0, 60.0, 40.0], strength: 0.36, engine: Engine::Rings { count: 4, thickness: 0.016 } },
-    // --- Névoa ---
+    Style { uri: "motion://rays-steel", name: "Raios de Aço", base: [9.0, 10.0, 13.0], tint: [120.0, 135.0, 165.0], tint2: [100.0, 115.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 6, width: 0.07 } },
+    Style { uri: "motion://rays-cyan", name: "Raios Ciano", base: [6.0, 11.0, 13.0], tint: [60.0, 170.0, 190.0], tint2: [50.0, 130.0, 170.0], strength: 0.34, engine: Engine::Rays { count: 5, width: 0.06 } },
+    Style { uri: "motion://rays-violet", name: "Raios Violetas", base: [10.0, 7.0, 14.0], tint: [110.0, 70.0, 170.0], tint2: [90.0, 60.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 6, width: 0.08 } },
+    Style { uri: "motion://rays-warm", name: "Raios Quentes", base: [12.0, 9.0, 7.0], tint: [150.0, 95.0, 45.0], tint2: [130.0, 80.0, 40.0], strength: 0.34, engine: Engine::Rays { count: 5, width: 0.07 } },
+        // --- Névoa ---
     Style { uri: "motion://fog-slate", name: "Névoa Ardósia", base: [9.0, 10.0, 12.0], tint: [70.0, 78.0, 92.0], tint2: [60.0, 70.0, 85.0], strength: 0.55, engine: Engine::Fog { scale: 1.6 } },
     Style { uri: "motion://fog-forest", name: "Névoa Floresta", base: [7.0, 11.0, 9.0], tint: [45.0, 80.0, 60.0], tint2: [40.0, 70.0, 75.0], strength: 0.50, engine: Engine::Fog { scale: 2.2 } },
     Style { uri: "motion://fog-dusk", name: "Névoa Crepúsculo", base: [11.0, 8.0, 13.0], tint: [85.0, 55.0, 95.0], tint2: [70.0, 60.0, 100.0], strength: 0.50, engine: Engine::Fog { scale: 1.9 } },
@@ -288,28 +281,14 @@ fn generate_style_frame(width: u32, height: u32, t: f32, s: &Style) -> Vec<u8> {
             let mut col = background(s.base, ny);
             let taper = smoothstep(0.0, 0.35, ny) * smoothstep(1.0, 0.65, ny);
             for i in 0..count {
-                let h0 = hash01(i, 20);
-                let slope = (h0 - 0.5) * 0.9;
                 let start = hash01(i, 21);
+                let slope = 0.45; // todos paralelos: feixes de luz, não zigue-zague
                 let x_line = (start + phase) .rem_euclid(1.0) * aspect + slope * (ny - 0.5) * aspect;
                 let mut dx = nx * aspect - x_line;
                 dx -= (dx / aspect).round() * aspect; // distância em anel (a tela dá a volta)
                 let g = (-(dx / rw).powi(2)).exp() * taper;
                 let c = if i % 2 == 0 { s.tint } else { s.tint2 };
-                col = add_scaled(col, c, str_ * g);
-            }
-            col.map(|c| c.min(255.0))
-        }),
-        Engine::Rings { count, thickness } => render_grid(width, height, |nx, ny, aspect| {
-            let mut col = background(s.base, ny);
-            for i in 0..count {
-                let cx = hash01(i, 30) * aspect;
-                let cy = 0.15 + 0.7 * hash01(i, 31);
-                let speed_off = hash01(i, 32);
-                let rr = (phase + speed_off).rem_euclid(1.0) * 0.55; // raio em alturas
-                let d = ((nx * aspect - cx).powi(2) + (ny - cy).powi(2)).sqrt();
-                let g = (-((d - rr) / thickness).powi(2)).exp() * (1.0 - rr / 0.55);
-                col = add_scaled(col, s.tint, str_ * g);
+                col = add_scaled(col, c, str_ * g / count as f32 * 2.0);
             }
             col.map(|c| c.min(255.0))
         }),
