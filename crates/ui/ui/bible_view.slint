@@ -62,6 +62,9 @@ export component HolyricsBibleView inherits Rectangle {
 
     callback exit-bible-mode();
     callback select-version(int);
+    callback toggle-compare();
+    in property <bool> compare-on: false;
+    in property <string> compare-text: "";
     callback select-book(int);
     callback select-chapter(int);
     callback select-verse-and-project(int);
@@ -190,6 +193,41 @@ export component HolyricsBibleView inherits Rectangle {
                             vta := TouchArea {
                                 mouse-cursor: pointer;
                                 clicked => { root.select-version(v-idx); }
+                            }
+                        }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                }
+
+                // 3b. Comparar versões do versículo ativo
+                Rectangle {
+                    height: root.compare-on ? 150px : 30px;
+                    background: ShadTheme.bg-bar;
+                    VerticalLayout {
+                        padding: 3px;
+                        spacing: 4px;
+                        HorizontalLayout {
+                            height: 24px;
+                            alignment: end;
+                            ShadButton {
+                                size: "xs";
+                                variant: root.compare-on ? "secondary" : "outline";
+                                label: root.compare-on ? "Fechar comparação" : "Comparar versões";
+                                clicked => { root.toggle-compare(); }
+                            }
+                        }
+                        if root.compare-on : Rectangle {
+                            background: ShadTheme.card;
+                            border-radius: 4px;
+                            clip: true;
+                            compare-txt := Text {
+                                x: 8px;
+                                y: 6px;
+                                width: parent.width - 16px;
+                                text: root.compare-text;
+                                wrap: word-wrap;
+                                font-size: 12px;
+                                color: ShadTheme.fg-secondary;
                             }
                         }
                     }

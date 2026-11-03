@@ -1860,6 +1860,17 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_bible_toggle_compare(move || {
+            let mut c = ctx.borrow_mut();
+            if let Some(w) = ui_weak.upgrade() {
+                w.set_bible_compare_on(!w.get_bible_compare_on());
+                refresh_bible_compare(&w, &mut c);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_bible_select_version(move |idx| {
             let mut c = ctx.borrow_mut();
             if idx >= 0 && (idx as usize) < c.bible_versions.len() {
@@ -2723,6 +2734,39 @@ fn update_active_theme_indicator(ui: &MainWindow, c: &mut AppContext) {
     }
 }
 
+/// Texto de comparação: o versículo ativo em todas as versões instaladas.
+fn refresh_bible_compare(ui: &MainWindow, c: &mut AppContext) {
+    if !ui.get_bible_compare_on() {
+        ui.set_bible_compare_text("".into());
+        return;
+    }
+    let book = ui.get_bible_active_book();
+    let chapter = ui.get_bible_active_chapter();
+    let verse = ui.get_bible_active_verse();
+    if c.bible_versions.is_empty() {
+        c.bible_versions = c
+            .rt
+            .block_on(c.storage.list_bible_versions())
+            .unwrap_or_default();
+    }
+    let mut blocks = Vec::new();
+    for v in c.bible_versions.clone() {
+        let verses = c
+            .rt
+            .block_on(c.storage.list_bible_chapter_verses(v.id, book, chapter))
+            .unwrap_or_default();
+        if let Some(found) = verses.iter().find(|x| x.verse == verse) {
+            blocks.push(format!("{}: {}", v.abbr, found.text));
+        }
+    }
+    let text = if blocks.is_empty() {
+        "Nenhuma versão tem este versículo.".to_string()
+    } else {
+        blocks.join("\n\n")
+    };
+    ui.set_bible_compare_text(text.into());
+}
+
 fn refresh_bible_studio_ui(ui: &MainWindow, c: &mut AppContext) {
     if c.bible_versions.is_empty() {
         c.bible_versions = c
@@ -2769,6 +2813,7 @@ fn refresh_bible_studio_ui(ui: &MainWindow, c: &mut AppContext) {
     }
     ui.set_bible_book_grid_rows(ModelRc::new(VecModel::from(book_rows)));
     ui.set_bible_active_book(c.bible_book_order);
+    refresh_bible_compare(ui, c);
 
     // 2. Chapters Grid (9 columns, padded with 0s for uniform tile widths)
     let ch_count = c

@@ -241,6 +241,8 @@ export component MainWindow inherits Window {
     in-out property <string> bible-license-notice: "Tradução Brasileira (1917) — Domínio Público";
     in-out property <[string]> bible-version-abbrs: ["TB1917", "WEB"];
     in-out property <int> bible-version-idx: 0;
+    in-out property <bool> bible-compare-on: false;
+    in-out property <string> bible-compare-text: "";
     in-out property <[UiBibleBookGridRow]> bible-book-grid-rows: [];
     in-out property <[UiNumberGridRow]> bible-chapter-grid-rows: [];
     in-out property <[UiNumberGridRow]> bible-verse-grid-rows: [];
@@ -403,6 +405,7 @@ export component MainWindow inherits Window {
 
     // Bible Studio
     callback bible-select-version(int);
+    callback bible-toggle-compare();
     callback bible-select-book(int);
     callback bible-select-chapter(int);
     callback bible-select-verse-project(int);
@@ -831,6 +834,9 @@ export component MainWindow inherits Window {
                 license-notice: root.bible-license-notice;
                 version-abbrs: root.bible-version-abbrs;
                 active-version-idx: root.bible-version-idx;
+                compare-on: root.bible-compare-on;
+                compare-text: root.bible-compare-text;
+                toggle-compare => { root.bible-toggle-compare(); }
                 book-grid-rows: root.bible-book-grid-rows;
                 chapter-grid-rows: root.bible-chapter-grid-rows;
                 verse-grid-rows: root.bible-verse-grid-rows;
