@@ -93,14 +93,14 @@ pub const STYLES: &[Style] = &[
     Style { uri: "motion://orbs-gold", name: "Orbes Âmbar", base: [12.0, 10.0, 7.0], tint: [120.0, 85.0, 30.0], tint2: [100.0, 60.0, 30.0], strength: 0.34, engine: Engine::Orbs { count: 5, radius: 0.24 } },
     Style { uri: "motion://orbs-mint", name: "Orbes Menta", base: [7.0, 12.0, 11.0], tint: [40.0, 120.0, 100.0], tint2: [50.0, 100.0, 130.0], strength: 0.36, engine: Engine::Orbs { count: 7, radius: 0.20 } },
     // --- Raios ---
-    Style { uri: "motion://rays-steel", name: "Raios de Aço", base: [9.0, 10.0, 13.0], tint: [120.0, 135.0, 165.0], tint2: [100.0, 115.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 6, width: 0.07 } },
-    Style { uri: "motion://rays-cyan", name: "Raios Ciano", base: [6.0, 11.0, 13.0], tint: [60.0, 170.0, 190.0], tint2: [50.0, 130.0, 170.0], strength: 0.34, engine: Engine::Rays { count: 5, width: 0.06 } },
-    Style { uri: "motion://rays-violet", name: "Raios Violetas", base: [10.0, 7.0, 14.0], tint: [110.0, 70.0, 170.0], tint2: [90.0, 60.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 6, width: 0.08 } },
-    Style { uri: "motion://rays-warm", name: "Raios Quentes", base: [12.0, 9.0, 7.0], tint: [150.0, 95.0, 45.0], tint2: [130.0, 80.0, 40.0], strength: 0.34, engine: Engine::Rays { count: 5, width: 0.07 } },
+    Style { uri: "motion://rays-steel", name: "Raios de Aço", base: [9.0, 10.0, 13.0], tint: [120.0, 135.0, 165.0], tint2: [100.0, 115.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 5, width: 0.022 } },
+    Style { uri: "motion://rays-cyan", name: "Raios Ciano", base: [6.0, 11.0, 13.0], tint: [60.0, 170.0, 190.0], tint2: [50.0, 130.0, 170.0], strength: 0.34, engine: Engine::Rays { count: 5, width: 0.018 } },
+    Style { uri: "motion://rays-violet", name: "Raios Violetas", base: [10.0, 7.0, 14.0], tint: [110.0, 70.0, 170.0], tint2: [90.0, 60.0, 150.0], strength: 0.36, engine: Engine::Rays { count: 5, width: 0.024 } },
+    Style { uri: "motion://rays-warm", name: "Raios Quentes", base: [12.0, 9.0, 7.0], tint: [150.0, 95.0, 45.0], tint2: [130.0, 80.0, 40.0], strength: 0.34, engine: Engine::Rays { count: 5, width: 0.020 } },
         // --- Névoa ---
-    Style { uri: "motion://fog-slate", name: "Névoa Ardósia", base: [9.0, 10.0, 12.0], tint: [70.0, 78.0, 92.0], tint2: [60.0, 70.0, 85.0], strength: 0.55, engine: Engine::Fog { scale: 1.6 } },
-    Style { uri: "motion://fog-forest", name: "Névoa Floresta", base: [7.0, 11.0, 9.0], tint: [45.0, 80.0, 60.0], tint2: [40.0, 70.0, 75.0], strength: 0.50, engine: Engine::Fog { scale: 2.2 } },
-    Style { uri: "motion://fog-dusk", name: "Névoa Crepúsculo", base: [11.0, 8.0, 13.0], tint: [85.0, 55.0, 95.0], tint2: [70.0, 60.0, 100.0], strength: 0.50, engine: Engine::Fog { scale: 1.9 } },
+    Style { uri: "motion://fog-slate", name: "Névoa Ardósia", base: [9.0, 10.0, 12.0], tint: [70.0, 78.0, 92.0], tint2: [60.0, 70.0, 85.0], strength: 0.55, engine: Engine::Fog { scale: 3.0 } },
+    Style { uri: "motion://fog-forest", name: "Névoa Floresta", base: [7.0, 11.0, 9.0], tint: [45.0, 80.0, 60.0], tint2: [40.0, 70.0, 75.0], strength: 0.50, engine: Engine::Fog { scale: 3.6 } },
+    Style { uri: "motion://fog-dusk", name: "Névoa Crepúsculo", base: [11.0, 8.0, 13.0], tint: [85.0, 55.0, 95.0], tint2: [70.0, 60.0, 100.0], strength: 0.50, engine: Engine::Fog { scale: 3.2 } },
     // --- Grade ---
     Style { uri: "motion://grid-pulse", name: "Grade Pulsante", base: [8.0, 9.0, 11.0], tint: [90.0, 120.0, 150.0], tint2: [90.0, 120.0, 150.0], strength: 0.55, engine: Engine::Grid { cells: 24.0 } },
     Style { uri: "motion://grid-amber", name: "Grade Âmbar", base: [11.0, 9.0, 7.0], tint: [150.0, 105.0, 50.0], tint2: [150.0, 105.0, 50.0], strength: 0.50, engine: Engine::Grid { cells: 16.0 } },
@@ -271,27 +271,14 @@ fn generate_style_frame(width: u32, height: u32, t: f32, s: &Style) -> Vec<u8> {
                 let r = radius * (0.8 + 0.4 * h0);
                 let dx = (nx * aspect - cx * aspect) / r;
                 let dy = (ny - cy) / r;
-                let g = (-(dx * dx + dy * dy)).exp();
+                let dist = (dx * dx + dy * dy).sqrt();
+                let g = smoothstep(1.0, 0.82, dist) * (0.75 + 0.25 * (1.0 - dist));
                 let c = if i % 2 == 0 { s.tint } else { s.tint2 };
                 col = add_scaled(col, c, str_ * g);
             }
             col.map(|c| c.min(255.0))
         }),
-        Engine::Rays { count, width: rw } => render_grid(width, height, |nx, ny, aspect| {
-            let mut col = background(s.base, ny);
-            let taper = smoothstep(0.0, 0.35, ny) * smoothstep(1.0, 0.65, ny);
-            for i in 0..count {
-                let start = hash01(i, 21);
-                let slope = 0.45; // todos paralelos: feixes de luz, não zigue-zague
-                let x_line = (start + phase) .rem_euclid(1.0) * aspect + slope * (ny - 0.5) * aspect;
-                let mut dx = nx * aspect - x_line;
-                dx -= (dx / aspect).round() * aspect; // distância em anel (a tela dá a volta)
-                let g = (-(dx / rw).powi(2)).exp() * taper;
-                let c = if i % 2 == 0 { s.tint } else { s.tint2 };
-                col = add_scaled(col, c, str_ * g / count as f32 * 2.0);
-            }
-            col.map(|c| c.min(255.0))
-        }),
+        Engine::Rays { count, width: rw } => rays_frame(width, height, phase, s, count, rw),
         Engine::Fog { scale } => render_grid(width, height, |nx, ny, aspect| {
             let mut v = 0.0;
             for j in 0..3 {
@@ -300,7 +287,7 @@ fn generate_style_frame(width: u32, height: u32, t: f32, s: &Style) -> Vec<u8> {
                 let c = 1 + (j % 2);
                 v += (TAU * (a * nx * aspect + b * ny) + TAU * c as f32 * phase + hash01(j, 42) * TAU).sin();
             }
-            let fog = smoothstep(-1.2, 2.0, v);
+            let fog = smoothstep(-0.4, 1.4, v);
             mix3(background(s.base, ny), mix3(s.tint, s.tint2, ny), fog * str_).map(|c| c.min(255.0))
         }),
         Engine::Grid { cells } => grid_frame(width, height, phase, s, cells),
@@ -357,7 +344,7 @@ fn particles_frame(
                     let v = match shape {
                         Shape::Disc => {
                             if d >= 1.0 { continue; }
-                            (1.0 - d * d) * (0.75 + 0.5 * smoothstep(0.85, 1.0, d))
+                            smoothstep(1.0, 0.92, d) * (0.85 + 0.15 * smoothstep(0.8, 1.0, d))
                         }
                         Shape::Ring => {
                             (-((d - 0.8) / 0.12).powi(2)).exp()
@@ -397,6 +384,43 @@ fn particles_frame(
             let idx = p * 4;
             for k in 0..3 {
                 pixels[idx + k] = c[k].clamp(0.0, 255.0) as u8;
+            }
+            pixels[idx + 3] = 255;
+        }
+    }
+    pixels
+}
+
+/// Raios em resolução total (sem reamostragem): feixes finos e nítidos, paralelos.
+fn rays_frame(width: u32, height: u32, phase: f32, s: &Style, count: u32, rw: f32) -> Vec<u8> {
+    let aspect = width.max(1) as f32 / height.max(1) as f32;
+    let w = width.max(1) as f32;
+    let h = height.max(1) as f32;
+    let slope = 0.45;
+    let mut lines: Vec<(f32, f32)> = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let start = hash01(i, 21);
+        lines.push(((start + phase).rem_euclid(1.0) * aspect, if i % 2 == 0 { 0.0 } else { 1.0 }));
+    }
+    let mut pixels = vec![0u8; (width as usize) * (height as usize) * 4];
+    for y in 0..height {
+        let ny = y as f32 / h;
+        let taper = smoothstep(0.0, 0.35, ny) * smoothstep(1.0, 0.65, ny);
+        let bg = background(s.base, ny);
+        for x in 0..width {
+            let nx = x as f32 / w;
+            let mut col = bg;
+            for &(x0, alt) in lines.iter() {
+                let x_line = x0 + slope * (ny - 0.5) * aspect;
+                let mut dx = nx * aspect - x_line;
+                dx -= (dx / aspect).round() * aspect;
+                let g = (-(dx / rw).powi(2)).exp() * taper;
+                let c = if alt == 0.0 { s.tint } else { s.tint2 };
+                col = add_scaled(col, c, s.strength * g / count as f32 * 2.0);
+            }
+            let idx = ((y * width + x) * 4) as usize;
+            for k in 0..3 {
+                pixels[idx + k] = col[k].clamp(0.0, 255.0) as u8;
             }
             pixels[idx + 3] = 255;
         }
