@@ -122,9 +122,45 @@ component TopMenuTrigger inherits Rectangle {
     }
 }
 
+component LibTab inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> active: false;
+    callback clicked();
+
+    border-radius: 4px;
+    background: root.active ? #26304a : (ta.has-hover ? ShadTheme.accent : transparent);
+    border-width: root.active ? 1px : 0px;
+    border-color: ShadTheme.live-blue-bright;
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 4px;
+        padding-left: 4px;
+        padding-right: 4px;
+        VerticalLayout {
+            alignment: center;
+            LucideIcon { name: root.icon; icon-size: 12px; tint: root.active ? #b9c6ea : ShadTheme.fg-muted; }
+        }
+        Text {
+            text: root.label;
+            font-size: 11px;
+            font-weight: root.active ? 600 : 500;
+            color: root.active ? #ffffff : ShadTheme.fg-muted;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
 component MenuActionRow inherits Rectangle {
     in property <string> label;
     in property <string> shortcut: "";
+    in property <string> icon: "";
     callback triggered();
 
     height: 26px;
@@ -134,7 +170,11 @@ component MenuActionRow inherits Rectangle {
     HorizontalLayout {
         padding-left: 10px;
         padding-right: 10px;
-        spacing: 12px;
+        spacing: 8px;
+        if root.icon != "" : VerticalLayout {
+            alignment: center;
+            LucideIcon { name: root.icon; icon-size: 13px; tint: ShadTheme.fg-muted; }
+        }
         Text {
             horizontal-stretch: 1;
             text: root.label;
@@ -230,6 +270,8 @@ export component MainWindow inherits Window {
     in-out property <[UiPlaylistRow]> playlist-song-rows: [];
     in-out property <[UiPlaylistRow]> playlist-media-rows: [];
     in-out property <int> active-playlist-row: -1;
+    property <length> drag-press-y: 0px;
+    property <length> drag-cur-y: 0px;
 
     // Column 5: Far-Right Vertical Theme Thumbnail Strip
     in-out property <bool> show-theme-strip: true;
@@ -545,18 +587,18 @@ export component MainWindow inherits Window {
                                     background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
                                     arq-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
-                                        MenuActionRow { label: "Importar Pasta de Letras (.txt)..."; triggered => { root.dialog-import-txt-folder(); } }
-                                        MenuActionRow { label: "Importar PPTX / OpenSong / OpenLP..."; triggered => { root.dialog-import-pptx-or-xml(); } }
-                                        MenuActionRow { label: "Importar Bíblia (Zefania / JSON)..."; triggered => { root.dialog-import-bible(); } }
+                                        MenuActionRow { label: "Importar Pasta de Letras (.txt)..."; icon: "folder"; triggered => { root.dialog-import-txt-folder(); } }
+                                        MenuActionRow { label: "Importar PPTX / OpenSong / OpenLP..."; icon: "folder"; triggered => { root.dialog-import-pptx-or-xml(); } }
+                                        MenuActionRow { label: "Importar Bíblia (Zefania / JSON)..."; icon: "book"; triggered => { root.dialog-import-bible(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
-                                        MenuActionRow { label: "Exportar Músicas em TXT..."; triggered => { root.dialog-export-txt(); } }
-                                        MenuActionRow { label: "Exportar Slides do Item Atual (PNG)..."; triggered => { root.dialog-export-slides(); } }
-                                        MenuActionRow { label: "Exportar Pacote JSON..."; triggered => { root.dialog-export-json(); } }
+                                        MenuActionRow { label: "Exportar Músicas em TXT..."; icon: "share"; triggered => { root.dialog-export-txt(); } }
+                                        MenuActionRow { label: "Exportar Slides do Item Atual (PNG)..."; icon: "monitor"; triggered => { root.dialog-export-slides(); } }
+                                        MenuActionRow { label: "Exportar Pacote JSON..."; icon: "share"; triggered => { root.dialog-export-json(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
-                                        MenuActionRow { label: "Criar Backup Completo (.zip)..."; triggered => { root.dialog-create-backup(); } }
-                                        MenuActionRow { label: "Restaurar Backup (.zip)..."; triggered => { root.dialog-restore-backup(); } }
+                                        MenuActionRow { label: "Criar Backup Completo (.zip)..."; icon: "folder"; triggered => { root.dialog-create-backup(); } }
+                                        MenuActionRow { label: "Restaurar Backup (.zip)..."; icon: "history"; triggered => { root.dialog-restore-backup(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
-                                        MenuActionRow { label: "Configurações..."; triggered => { root.active-modal = 7; } }
+                                        MenuActionRow { label: "Configurações..."; icon: "settings"; triggered => { root.active-modal = 7; } }
                                     }
                                 }
                             }
@@ -574,11 +616,11 @@ export component MainWindow inherits Window {
                                     background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
                                     novo-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
-                                        MenuActionRow { label: "Nova Música..."; triggered => { root.editor-new-song(); root.active-modal = 2; } }
-                                        MenuActionRow { label: "Novo Culto..."; triggered => { root.create-new-service(); } }
-                                        MenuActionRow { label: "Criar próximos 8 cultos recorrentes"; triggered => { root.create-recurring-services(); } }
-                                        MenuActionRow { label: "Adicionar Mídia (Vídeo/Áudio/Img)..."; triggered => { root.pick-and-add-media(); } }
-                                        MenuActionRow { label: "Nova Contagem Regressiva..."; triggered => { root.preview-studio-countdown("10", "00", "", "Para iniciar o culto", 0, true, false); root.active-modal = 1; } }
+                                        MenuActionRow { label: "Nova Música..."; icon: "music"; triggered => { root.editor-new-song(); root.active-modal = 2; } }
+                                        MenuActionRow { label: "Novo Culto..."; icon: "list"; triggered => { root.create-new-service(); } }
+                                        MenuActionRow { label: "Criar próximos 8 cultos recorrentes"; icon: "clock"; triggered => { root.create-recurring-services(); } }
+                                        MenuActionRow { label: "Adicionar Mídia (Vídeo/Áudio/Img)..."; icon: "plus"; triggered => { root.pick-and-add-media(); } }
+                                        MenuActionRow { label: "Nova Contagem Regressiva..."; icon: "clock"; triggered => { root.preview-studio-countdown("10", "00", "", "Para iniciar o culto", 0, true, false); root.active-modal = 1; } }
                                     }
                                 }
                             }
@@ -902,10 +944,14 @@ export component MainWindow inherits Window {
                             HorizontalLayout {
                                 padding: 3px;
                                 spacing: 3px;
-                                ShadTabStrip {
+                                HorizontalLayout {
                                     horizontal-stretch: 1;
-                                    tabs: ["Letras", "Texto", "Áudio", "Vídeo", "Img"];
-                                    active-index <=> root.left-lib-tab;
+                                    spacing: 2px;
+                                    LibTab { horizontal-stretch: 1; label: "Letras"; icon: "music"; active: root.left-lib-tab == 0; clicked => { root.left-lib-tab = 0; } }
+                                    LibTab { horizontal-stretch: 1; label: "Texto"; icon: "edit"; active: root.left-lib-tab == 1; clicked => { root.left-lib-tab = 1; } }
+                                    LibTab { horizontal-stretch: 1; label: "Áudio"; icon: "monitor"; active: root.left-lib-tab == 2; clicked => { root.left-lib-tab = 2; } }
+                                    LibTab { horizontal-stretch: 1; label: "Vídeo"; icon: "play"; active: root.left-lib-tab == 3; clicked => { root.left-lib-tab = 3; } }
+                                    LibTab { horizontal-stretch: 1; label: "Img"; icon: "grid"; active: root.left-lib-tab == 4; clicked => { root.left-lib-tab = 4; } }
                                 }
                                 ShadIconButton {
                                     icon: "plus";
@@ -1678,7 +1724,21 @@ export component MainWindow inherits Window {
                                         width: max(24px, parent.width - 54px);
                                         height: 100%;
                                         mouse-cursor: pointer;
-                                        clicked => { root.activate-playlist-item(pl.row-idx); }
+                                        // Clique (pouca distância) projeta; arrastar para cima/baixo reordena.
+                                        pointer-event(ev) => {
+                                            if (ev.kind == PointerEventKind.down) {
+                                                root.drag-press-y = self.mouse-y;
+                                                root.drag-cur-y = self.mouse-y;
+                                            }
+                                        }
+                                        moved => { root.drag-cur-y = self.mouse-y; }
+                                        clicked => {
+                                            if (abs(root.drag-cur-y - root.drag-press-y) < 6px) {
+                                                root.activate-playlist-item(pl.row-idx);
+                                            } else {
+                                                root.move-playlist-item(pl.row-idx, round((root.drag-cur-y - root.drag-press-y) / 44px));
+                                            }
+                                        }
                                     }
 
                                     HorizontalLayout {
