@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS songs (
 CREATE INDEX IF NOT EXISTS idx_songs_archived_title ON songs(archived, title);
 CREATE INDEX IF NOT EXISTS idx_songs_hash ON songs(normalized_hash);
 CREATE INDEX IF NOT EXISTS idx_songs_title_artist ON songs(title, artist);
+CREATE INDEX IF NOT EXISTS idx_songs_title_artist_nocase ON songs(title COLLATE NOCASE, artist COLLATE NOCASE);
 
 CREATE TABLE IF NOT EXISTS song_slides (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

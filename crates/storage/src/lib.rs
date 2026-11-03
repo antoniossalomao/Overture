@@ -232,7 +232,7 @@ impl Storage {
         }
 
         let dup_title_artist: Option<i64> = sqlx::query_scalar(
-            "SELECT id FROM songs WHERE lower(title) = lower(?) AND lower(artist) = lower(?) LIMIT 1",
+            "SELECT id FROM songs WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE LIMIT 1",
         )
         .bind(&song.title)
         .bind(&song.artist)
@@ -287,6 +287,111 @@ impl Storage {
             id: song_id,
             duplicate_title_artist: is_dup_marked,
         })
+    }
+
+    /// Importação em lote: uma transação, duplicatas exatas ignoradas e grupo automático por artista.
+    /// Pensada para bibliotecas grandes (dezenas de milhares de músicas).
+    pub async fn import_songs_bulk(
+        &self,
+        songs: &[Song],
+        group_by_artist: bool,
+    ) -> Result<BulkImportReport> {
+        let mut report = BulkImportReport::default();
+        let mut group_cache: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        let mut tx = self.pool.begin().await?;
+
+        for song in songs {
+            let slide_refs: Vec<&str> = song.slides.iter().map(|s| s.text.as_str()).collect();
+            let norm_hash = canonical_lyrics_key(&slide_refs);
+            if !norm_hash.is_empty() {
+                let existing: Option<i64> =
+                    sqlx::query_scalar("SELECT id FROM songs WHERE normalized_hash = ? LIMIT 1")
+                        .bind(&norm_hash)
+                        .fetch_optional(&mut *tx)
+                        .await?;
+                if existing.is_some() {
+                    report.skipped_duplicates += 1;
+                    continue;
+                }
+            }
+
+            let dup_title_artist: Option<i64> = sqlx::query_scalar(
+                "SELECT id FROM songs WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE LIMIT 1",
+            )
+            .bind(&song.title)
+            .bind(&song.artist)
+            .fetch_optional(&mut *tx)
+            .await?;
+            let is_dup_marked = song.duplicate_marked || dup_title_artist.is_some();
+            if is_dup_marked {
+                report.marked_title_artist += 1;
+            }
+
+            let group_id = match song.group_id {
+                Some(g) => Some(g),
+                None if group_by_artist && !song.artist.trim().is_empty() => {
+                    let key = song.artist.trim().to_string();
+                    if let Some(id) = group_cache.get(&key) {
+                        Some(*id)
+                    } else {
+                        sqlx::query("INSERT OR IGNORE INTO groups (name) VALUES (?)")
+                            .bind(&key)
+                            .execute(&mut *tx)
+                            .await?;
+                        let id: i64 = sqlx::query_scalar("SELECT id FROM groups WHERE name = ?")
+                            .bind(&key)
+                            .fetch_one(&mut *tx)
+                            .await?;
+                        group_cache.insert(key, id);
+                        Some(id)
+                    }
+                }
+                None => None,
+            };
+
+            let search_blob = build_song_search_blob(song);
+            let created_at = if song.created_at.is_empty() {
+                chrono::Utc::now().to_rfc3339()
+            } else {
+                song.created_at.clone()
+            };
+            let res = sqlx::query(
+                r#"INSERT INTO songs
+                   (title, artist, author, group_id, notes, source, archived, duplicate_marked, normalized_hash, search_blob, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            )
+            .bind(&song.title)
+            .bind(&song.artist)
+            .bind(&song.author)
+            .bind(group_id)
+            .bind(&song.notes)
+            .bind(&song.source)
+            .bind(song.archived as i32)
+            .bind(is_dup_marked as i32)
+            .bind(&norm_hash)
+            .bind(&search_blob)
+            .bind(&created_at)
+            .execute(&mut *tx)
+            .await?;
+            let song_id = res.last_insert_rowid();
+            for (idx, slide) in song.slides.iter().enumerate() {
+                sqlx::query(
+                    r#"INSERT INTO song_slides (song_id, "order", text, forced_break, duration_secs)
+                       VALUES (?, ?, ?, ?, ?)"#,
+                )
+                .bind(song_id)
+                .bind(idx as i32)
+                .bind(&slide.text)
+                .bind(slide.forced_break as i32)
+                .bind(slide.duration_secs.map(|d| d as i64))
+                .execute(&mut *tx)
+                .await?;
+            }
+            report.inserted += 1;
+        }
+        report.groups_total = group_cache.len();
+        tx.commit().await?;
+        Ok(report)
     }
 
     pub async fn update_song(&self, song: &Song) -> Result<()> {
@@ -1667,4 +1772,17 @@ mod bible_filter_tests {
         assert_eq!(text, "@livro:99 @xyz");
         assert!(f.is_empty());
     }
+}
+
+/// Resultado de uma importação em lote.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct BulkImportReport {
+    /// Músicas gravadas.
+    pub inserted: usize,
+    /// Duplicatas exatas (mesmas letras) ignoradas.
+    pub skipped_duplicates: usize,
+    /// Músicas gravadas com mesmo título e artista de outra (marcadas para revisão).
+    pub marked_title_artist: usize,
+    /// Grupos (artistas) usados pela importação.
+    pub groups_total: usize,
 }

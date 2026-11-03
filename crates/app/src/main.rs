@@ -975,20 +975,12 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             let c = ctx.borrow();
             let status = match parse_txt_directory(&folder, "user_txt", DEFAULT_MAX_LINE_CHARS) {
                 Ok((songs, report)) => {
-                    let mut db_inserted = 0usize;
-                    let mut db_skipped = 0usize;
-                    for s in &songs {
-                        if let Ok(outcome) = c.rt.block_on(c.storage.insert_song(s, true)) {
-                            match outcome {
-                                overture_storage::SongInsertOutcome::Inserted { .. } => {
-                                    db_inserted += 1
-                                }
-                                overture_storage::SongInsertOutcome::SkippedExactDuplicate {
-                                    ..
-                                } => db_skipped += 1,
-                            }
-                        }
-                    }
+                    // Lote em uma transação, com grupo automático por artista.
+                    let bulk = c.rt.block_on(c.storage.import_songs_bulk(&songs, true));
+                    let (db_inserted, db_skipped) = match &bulk {
+                        Ok(r) => (r.inserted, r.skipped_duplicates),
+                        Err(_) => (0, 0),
+                    };
                     format!(
                         "Importação TXT concluída: {} músicas | {} com quebra automática (>38c) | {} duplicatas ignoradas",
                         db_inserted,
