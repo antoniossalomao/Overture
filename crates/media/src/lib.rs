@@ -2,8 +2,10 @@
 
 pub mod engine;
 pub mod libmpv_ffi;
+pub mod motion;
 
-pub use engine::{MediaCommand, MediaEngine, MotionPreset, generate_motion_frame};
+pub use engine::{MediaCommand, MediaEngine};
+pub use motion::{BOKEH_STYLES, MOTION_LOOP_SECS, MotionPreset, WAVE_STYLES, generate_motion_frame};
 pub use libmpv_ffi::{LibMpvPlayer, probe_libmpv_path};
 
 #[cfg(test)]

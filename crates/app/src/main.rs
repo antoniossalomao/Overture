@@ -247,7 +247,7 @@ fn main() -> Result<()> {
         .block_on(storage.list_bible_versions())
         .unwrap_or_default();
 
-    let media_engine = MediaEngine::spawn(960, 540);
+    let media_engine = MediaEngine::spawn(1920, 1080);
     if let Some(main_t) = themes.iter().find(|t| t.id == initial_theme_id)
         && let BackgroundSpec::Video {
             path,
@@ -3443,19 +3443,16 @@ async fn seed_initial_demo_data_if_empty(storage: &Storage) -> Result<()> {
         ("Motion — Aurora Boreal", "motion://aurora"),
         ("Motion — Oceano Profundo", "motion://ocean"),
         ("Motion — Âmbar Dourado", "motion://warm"),
-        ("Motion — Grafite", "motion://graphite"),
-        ("Motion — Névoa Carvão", "motion://charcoal-fog"),
-        ("Motion — Meia-Noite", "motion://midnight"),
-        ("Motion — Brasa Apagada", "motion://ember-dim"),
-        ("Motion — Violeta Escuro", "motion://violet-haze"),
-        ("Motion — Verde-Azulado Profundo", "motion://teal-deep"),
-        ("Motion — Crepúsculo Rosé", "motion://dusk-rose"),
-        ("Motion — Aço Azulado", "motion://steel-blue"),
-        ("Motion — Oliva Escuro", "motion://olive-dark"),
-        ("Motion — Tinta e Partículas", "motion://ink-specks"),
         ("Motion — Bokeh Azul-Petróleo", "motion://bokeh-teal"),
         ("Motion — Bokeh Grafite", "motion://bokeh-graphite"),
         ("Motion — Bokeh Violeta", "motion://bokeh-violet"),
+        ("Motion — Bokeh Brasa Apagada", "motion://bokeh-ember"),
+        ("Motion — Ondas Azul-Petróleo", "motion://wave-teal"),
+        ("Motion — Ondas Índigo", "motion://wave-indigo"),
+        ("Motion — Ondas Ameixa", "motion://wave-plum"),
+        ("Motion — Ondas Musgo", "motion://wave-moss"),
+        ("Motion — Ondas Ardósia", "motion://wave-slate"),
+        ("Motion — Ondas Brasa", "motion://wave-ember"),
     ] {
         storage
             .upsert_media(&MediaItem {
