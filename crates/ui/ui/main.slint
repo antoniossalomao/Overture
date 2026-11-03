@@ -365,6 +365,7 @@ export component MainWindow inherits Window {
     callback dialog-import-pptx-or-xml();
     callback dialog-import-bible();
     callback dialog-export-txt();
+    callback dialog-export-slides();
     callback dialog-export-json();
     callback dialog-create-backup();
     callback dialog-restore-backup();
@@ -530,6 +531,7 @@ export component MainWindow inherits Window {
                                         MenuActionRow { label: "Importar Bíblia (Zefania / JSON)..."; triggered => { root.dialog-import-bible(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
                                         MenuActionRow { label: "Exportar Músicas em TXT..."; triggered => { root.dialog-export-txt(); } }
+                                        MenuActionRow { label: "Exportar Slides do Item Atual (PNG)..."; triggered => { root.dialog-export-slides(); } }
                                         MenuActionRow { label: "Exportar Pacote JSON..."; triggered => { root.dialog-export-json(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
                                         MenuActionRow { label: "Criar Backup Completo (.zip)..."; triggered => { root.dialog-create-backup(); } }

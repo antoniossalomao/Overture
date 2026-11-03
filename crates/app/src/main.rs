@@ -1067,6 +1067,31 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_dialog_export_slides(move || {
+            let Some(out_dir) = rfd::FileDialog::new()
+                .set_title("Escolher Pasta para Exportar Slides em PNG")
+                .pick_folder()
+            else {
+                return;
+            };
+            let mut c = ctx.borrow_mut();
+            let st = c.engine.snapshot();
+            let msg = match st.current_item.clone() {
+                None => "Nenhum item ao vivo para exportar.".to_string(),
+                Some(item) if item.slides.is_empty() => "O item atual não tem slides.".to_string(),
+                Some(item) => match export_item_slides_png(&mut c.preview_compositor, &st, &item.title, &out_dir) {
+                    Ok(n) => format!("{n} slides exportados em PNG para {}", out_dir.display()),
+                    Err(e) => format!("Falha ao exportar slides: {e}"),
+                },
+            };
+            if let Some(w) = ui_weak.upgrade() {
+                w.set_status_banner(msg.into());
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_dialog_export_txt(move || {
             let Some(out_dir) = rfd::FileDialog::new()
                 .set_title("Escolher Pasta para Exportar Letras em .TXT")
@@ -3553,4 +3578,29 @@ async fn seed_initial_demo_data_if_empty(storage: &Storage) -> Result<()> {
         .await?;
 
     Ok(())
+}
+
+/// Renderiza cada slide do item ao vivo em 1920×1080 (saída principal) e salva como PNG.
+fn export_item_slides_png(
+    compositor: &mut SlideCompositor,
+    st: &overture_core::OutputState,
+    item_title: &str,
+    out_dir: &std::path::Path,
+) -> anyhow::Result<usize> {
+    let slide_count = st.current_item.as_ref().map(|i| i.slides.len()).unwrap_or(0);
+    let safe_title: String = item_title
+        .chars()
+        .map(|ch| if r#":<>"|?*/\\"#.contains(ch) { '-' } else { ch })
+        .collect();
+    for i in 0..slide_count {
+        let mut s2 = st.clone();
+        s2.current_slide_index = i;
+        s2.display_mode = overture_core::DisplayMode::Normal;
+        let frame = compositor.compose(&s2, OutputRole::Main, 1920, 1080, None);
+        let img = image::RgbaImage::from_raw(frame.width, frame.height, frame.pixels)
+            .ok_or_else(|| anyhow::anyhow!("buffer de imagem inválido"))?;
+        let path = out_dir.join(format!("{:02} - {}.png", i + 1, safe_title.trim()));
+        img.save(&path)?;
+    }
+    Ok(slide_count)
 }
