@@ -60,6 +60,34 @@ O servidor escuta na rede local (ex.: `http://<IP_DA_MAQUINA>:4875`) e aceita co
 
 ---
 
+## 4b. Recursos Adicionados (estúdio e saída)
+
+| Recurso | Onde ativar | Observação |
+|---|---|---|
+| Itálico | Editor de Temas → "Itálico" | Propriedade `italic` do tema |
+| Brilho (glow) | Editor de Temas → "Brilho" | Halo branco de 6 px (escalado pela resolução) |
+| Maiúsculas | Editor de Temas → "Maiúsculas" | Preset do monitor de retorno já liga por padrão |
+| Relógio HH:MM | Editor de Temas → "Relógio" | Canto superior direito da saída principal; atualiza a cada segundo |
+| Transição fade | Campo `transition` do tema (padrão 180 ms) | Cross-fade ao trocar de slide |
+| Repetir / parar no fim | Botão "Repetir / Parar no fim" na barra de apresentação automática | Padrão: repetir |
+| Exportar slides PNG | Menu *Arquivo → Exportar Slides do Item Atual (PNG)* | Um PNG por slide, 1920×1080, com o tema da saída principal |
+| Cultos recorrentes | Menu *Novo → Criar próximos 8 cultos recorrentes* | Dia da semana em `recurring_weekday` nas configurações (0 = domingo) |
+| Relatório por grupo | Modal *Relatórios* → botão "Por grupo / Por música" | Agrupa execuções pelo grupo da música |
+| Comparar versões | Bíblia → "Comparar versões" | Versículo ativo em todas as versões instaladas |
+| Filtros na busca bíblica | Campo de busca da Bíblia | `@AT`, `@NT`, `@livro:N`, `@cap:N`, combináveis com texto |
+
+Temas salvos antes desta versão continuam válidos: os campos novos recebem o valor padrão.
+
+## 4c. Fundos de Letra Animados
+
+- Estilos em `crates/media/src/motion.rs` (`STYLES`): 30 fundos escuros em 8 motores de movimento.
+- Todo movimento fecha o ciclo em `MOTION_LOOP_SECS = 24` s; os testes verificam que o frame em `t` e `t + 24` é idêntico.
+- **Tempo real:** o gerador procedural roda na thread de mídia, a 1920×1080 e ~30 fps, em release (~16–23 ms por frame).
+- **Vídeo:** se existir `assets/motion/<nome>.mp4` ao lado do executável (ou em `./assets/motion`), o estilo toca via libmpv em loop.
+- **Gerar os vídeos:**
+  - Pelo GitHub: *Actions → Fundos de letra em vídeo → Run workflow* (artefato `motion-videos`).
+  - Localmente: `cargo run --release -p overture-media --example export_motion -- <pasta_saida> [filtro]` (precisa de `ffmpeg` com libx264 no PATH).
+
 ## 5. Instalador MSI, Atualização In-Place e Desinstalação
 
 ### Geração Reprodutível

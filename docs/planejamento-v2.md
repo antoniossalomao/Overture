@@ -1,6 +1,6 @@
 # Planejamento v2: app de projeção para cultos em Rust
 
-Status: planejamento. Nenhuma importação feita.
+Status: histórico de planejamento. Fases 0–7 implementadas no código (ver `README.md` e `docs/guia-completo.md` para o estado atual). A seção 4 foi escrita antes da importação, e a lista de recursos do Holyrics em comparação está em `docs/guia-completo.md` (seção 4b).
 
 ## 1. Decisões fechadas
 
