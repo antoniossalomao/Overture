@@ -412,11 +412,12 @@ impl SlideCompositor {
         if state.display_mode != DisplayMode::ClearText
             && let Some(slide) = state.current_slide()
         {
+            let shown = if theme.uppercase { slide.text.to_uppercase() } else { slide.text.clone() };
             if !slide.text.trim().is_empty() {
                 self.draw_text_block(
                     &mut frame,
                     TextBlockSpec {
-                        text: &slide.text,
+                        text: &shown,
                         font_family: &theme.font_family,
                         font_size_px: font_px,
                         line_height_px: font_px * theme.line_height_scale,
@@ -667,10 +668,9 @@ impl SlideCompositor {
             RgbaColor::new(15, 23, 42, 255),
         );
 
-        let current_text = state
-            .current_slide()
-            .map(|s| s.text.as_str())
-            .unwrap_or("—");
+        let current_raw = state.current_slide().map(|s| s.text.as_str()).unwrap_or("—");
+        let current_owned = if state.return_theme.uppercase { current_raw.to_uppercase() } else { current_raw.to_string() };
+        let current_text = current_owned.as_str();
         let cur_font = (62.0 * scale).max(12.0);
         self.draw_text_block(
             &mut frame,

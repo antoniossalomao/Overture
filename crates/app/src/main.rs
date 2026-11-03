@@ -3045,6 +3045,7 @@ fn populate_theme_editor_fields(ui: &MainWindow, t: &Theme) {
     ui.set_theme_italic(t.config.italic);
     ui.set_theme_glow(t.config.glow.enabled);
     ui.set_theme_clock(t.config.show_clock);
+    ui.set_theme_uppercase(t.config.uppercase);
     ui.set_theme_is_return(t.is_return_theme);
     ui.set_theme_align_index(match t.config.h_align {
         HorizontalAlign::Left => 0,
@@ -3087,6 +3088,7 @@ fn read_theme_config_from_ui(ui: &MainWindow) -> ThemeConfig {
     cfg.shadow.enabled = ui.get_theme_shadow_enabled();
     cfg.italic = ui.get_theme_italic();
     cfg.show_clock = ui.get_theme_clock();
+    cfg.uppercase = ui.get_theme_uppercase();
     if ui.get_theme_glow() {
         cfg.glow = overture_core::GlowSpec {
             enabled: true,

@@ -176,6 +176,8 @@ pub struct ThemeConfig {
     pub glow: GlowSpec,
     /// Mostra o relógio (HH:MM) no canto superior direito da saída principal.
     pub show_clock: bool,
+    /// Texto em maiúsculas.
+    pub uppercase: bool,
 }
 
 impl Default for ThemeConfig {
@@ -196,6 +198,7 @@ impl Default for ThemeConfig {
             italic: false,
             glow: GlowSpec::OFF,
             show_clock: false,
+            uppercase: false,
         }
     }
 }
@@ -221,6 +224,7 @@ impl ThemeConfig {
             italic: false,
             glow: GlowSpec::OFF,
             show_clock: false,
+            uppercase: false,
         }
     }
 
@@ -248,6 +252,7 @@ impl ThemeConfig {
             italic: false,
             glow: GlowSpec::OFF,
             show_clock: false,
+            uppercase: true,
         }
     }
 }

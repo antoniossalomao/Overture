@@ -281,6 +281,7 @@ export component MainWindow inherits Window {
     in-out property <bool> theme-italic: false;
     in-out property <bool> theme-glow: false;
     in-out property <bool> theme-clock: false;
+    in-out property <bool> theme-uppercase: false;
     in-out property <bool> theme-is-return: false;
     in-out property <int> theme-align-index: 1;
     in-out property <image> theme-live-preview;
@@ -1881,6 +1882,7 @@ export component MainWindow inherits Window {
             edit-italic <=> root.theme-italic;
             edit-glow <=> root.theme-glow;
             edit-clock <=> root.theme-clock;
+            edit-uppercase <=> root.theme-uppercase;
             edit-is-return <=> root.theme-is-return;
             edit-align <=> root.theme-align-index;
             theme-preview-image: root.theme-live-preview;
