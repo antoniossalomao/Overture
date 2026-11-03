@@ -366,6 +366,7 @@ export component MainWindow inherits Window {
     callback dialog-import-bible();
     callback dialog-export-txt();
     callback dialog-export-slides();
+    callback create-recurring-services();
     callback dialog-export-json();
     callback dialog-create-backup();
     callback dialog-restore-backup();
@@ -557,6 +558,7 @@ export component MainWindow inherits Window {
                                         padding: 4px; spacing: 1px;
                                         MenuActionRow { label: "Nova Música..."; triggered => { root.editor-new-song(); root.active-modal = 2; } }
                                         MenuActionRow { label: "Novo Culto..."; triggered => { root.create-new-service(); } }
+                                        MenuActionRow { label: "Criar próximos 8 cultos recorrentes"; triggered => { root.create-recurring-services(); } }
                                         MenuActionRow { label: "Adicionar Mídia (Vídeo/Áudio/Img)..."; triggered => { root.pick-and-add-media(); } }
                                         MenuActionRow { label: "Nova Contagem Regressiva..."; triggered => { root.preview-studio-countdown("10", "00", "", "Para iniciar o culto", 0, true, false); root.active-modal = 1; } }
                                     }

@@ -1252,6 +1252,43 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_create_recurring_services(move || {
+            let mut c = ctx.borrow_mut();
+            let weekday = c.settings.recurring_weekday;
+            let name = c.settings.recurring_service_name.clone();
+            let today = chrono::Local::now().date_naive();
+            let dates = overture_core::next_weekly_dates(today, weekday, 8);
+            let existing: std::collections::HashSet<String> = c
+                .rt
+                .block_on(c.storage.list_services(true))
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|s| s.name == name)
+                .map(|s| s.date)
+                .collect();
+            let mut created = Vec::new();
+            for d in dates {
+                let iso = d.format("%Y-%m-%d").to_string();
+                if existing.contains(&iso) {
+                    continue;
+                }
+                if c.rt.block_on(c.storage.create_service(&iso, &name)).is_ok() {
+                    created.push(d.format("%d/%m").to_string());
+                }
+            }
+            if let Some(w) = ui_weak.upgrade() {
+                let msg = if created.is_empty() {
+                    "Nenhum culto novo: as datas recorrentes já existem.".to_string()
+                } else {
+                    format!("{} cultos recorrentes criados: {}", created.len(), created.join(", "))
+                };
+                w.set_status_banner(msg.into());
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_activate_playlist_item(move |row_idx| {
             if row_idx < 0 {
                 return;

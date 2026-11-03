@@ -684,7 +684,26 @@ impl Default for ShortcutMap {
     }
 }
 
+/// Próximas `count` datas semanais (a partir de `from`, inclusive) no dia da semana `weekday` (0 = domingo .. 6 = sábado).
+pub fn next_weekly_dates(from: chrono::NaiveDate, weekday: u32, count: usize) -> Vec<chrono::NaiveDate> {
+    use chrono::Datelike;
+    let mut out = Vec::with_capacity(count);
+    let mut d = from;
+    while d.weekday().num_days_from_sunday() != weekday % 7 {
+        d = d.succ_opt().unwrap_or(d);
+    }
+    for _ in 0..count {
+        out.push(d);
+        d = match d.checked_add_days(chrono::Days::new(7)) {
+            Some(n) => n,
+            None => break,
+        };
+    }
+    out
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppSettings {
     pub locale: String,
     pub api_port: u16,
@@ -693,6 +712,10 @@ pub struct AppSettings {
     pub auto_advance_default_secs: Option<u32>,
     pub shortcuts: ShortcutMap,
     pub monitor_assignment: MonitorAssignment,
+    /// Dia da semana dos cultos recorrentes (0 = domingo .. 6 = sábado).
+    pub recurring_weekday: u32,
+    /// Nome dos cultos criados pela recorrência.
+    pub recurring_service_name: String,
 }
 
 impl Default for AppSettings {
@@ -705,6 +728,30 @@ impl Default for AppSettings {
             auto_advance_default_secs: None,
             shortcuts: ShortcutMap::default(),
             monitor_assignment: MonitorAssignment::default(),
+            recurring_weekday: 0,
+            recurring_service_name: "Culto Dominical".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod recurrence_tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    #[test]
+    fn weekly_dates_land_on_requested_weekday() {
+        // 2026-11-03 é terça-feira. Próximo domingo = 2026-11-08.
+        let from = NaiveDate::from_ymd_opt(2026, 11, 3).unwrap();
+        let dates = next_weekly_dates(from, 0, 3);
+        assert_eq!(dates[0], NaiveDate::from_ymd_opt(2026, 11, 8).unwrap());
+        assert_eq!(dates[1], NaiveDate::from_ymd_opt(2026, 11, 15).unwrap());
+        assert_eq!(dates[2], NaiveDate::from_ymd_opt(2026, 11, 22).unwrap());
+    }
+
+    #[test]
+    fn includes_start_day_when_it_matches() {
+        let from = NaiveDate::from_ymd_opt(2026, 11, 8).unwrap(); // domingo
+        assert_eq!(next_weekly_dates(from, 0, 1)[0], from);
     }
 }
