@@ -3453,6 +3453,9 @@ async fn seed_initial_demo_data_if_empty(storage: &Storage) -> Result<()> {
         ("Motion — Aço Azulado", "motion://steel-blue"),
         ("Motion — Oliva Escuro", "motion://olive-dark"),
         ("Motion — Tinta e Partículas", "motion://ink-specks"),
+        ("Motion — Bokeh Azul-Petróleo", "motion://bokeh-teal"),
+        ("Motion — Bokeh Grafite", "motion://bokeh-graphite"),
+        ("Motion — Bokeh Violeta", "motion://bokeh-violet"),
     ] {
         storage
             .upsert_media(&MediaItem {

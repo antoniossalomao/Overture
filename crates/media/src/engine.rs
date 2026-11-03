@@ -33,7 +33,28 @@ pub enum MotionPreset {
     WarmGold,
     /// Índice em `DARK_MOTIONS` (fundos escuros, em loop).
     Dark(usize),
+    /// Índice em `BOKEH_STYLES` (partículas tipo bokeh, em loop).
+    Bokeh(usize),
 }
+
+/// Fundo de partículas bokeh: discos suaves e faíscas que sobem devagar sobre um gradiente escuro.
+pub struct BokehStyle {
+    pub uri: &'static str,
+    pub name: &'static str,
+    /// Cor do topo e da base do gradiente.
+    pub top: [f32; 3],
+    pub bottom: [f32; 3],
+    /// Cor do brilho das partículas.
+    pub tint: [f32; 3],
+    /// Quantidade de partículas.
+    pub count: u32,
+}
+
+pub const BOKEH_STYLES: &[BokehStyle] = &[
+    BokehStyle { uri: "motion://bokeh-teal", name: "Bokeh Azul-Petróleo", top: [12.0, 14.0, 16.0], bottom: [14.0, 62.0, 78.0], tint: [150.0, 210.0, 230.0], count: 170 },
+    BokehStyle { uri: "motion://bokeh-graphite", name: "Bokeh Grafite", top: [12.0, 12.0, 13.0], bottom: [40.0, 42.0, 46.0], tint: [200.0, 205.0, 212.0], count: 140 },
+    BokehStyle { uri: "motion://bokeh-violet", name: "Bokeh Violeta", top: [10.0, 8.0, 16.0], bottom: [48.0, 30.0, 78.0], tint: [200.0, 170.0, 235.0], count: 150 },
+];
 
 /// Fundo escuro animado, gerado do zero. Todo movimento tem período fixo de `MOTION_LOOP_SECS`,
 /// então o ciclo fecha sem salto e o loop não aparece.
@@ -72,6 +93,9 @@ impl MotionPreset {
         let lower = uri.to_ascii_lowercase();
         if let Some(i) = DARK_MOTIONS.iter().position(|m| m.uri == lower) {
             return Self::Dark(i);
+        }
+        if let Some(i) = BOKEH_STYLES.iter().position(|m| m.uri == lower) {
+            return Self::Bokeh(i);
         }
         if lower.contains("ocean") || lower.contains("agua") {
             Self::Ocean
@@ -285,6 +309,9 @@ pub fn generate_motion_frame(
     if let MotionPreset::Dark(i) = preset {
         return generate_dark_frame(width, height, t_secs, &DARK_MOTIONS[i.min(DARK_MOTIONS.len() - 1)]);
     }
+    if let MotionPreset::Bokeh(i) = preset {
+        return generate_bokeh_frame(width, height, t_secs, &BOKEH_STYLES[i.min(BOKEH_STYLES.len() - 1)]);
+    }
     let mut pixels = vec![0u8; (width as usize) * (height as usize) * 4];
     let wf = width.max(1) as f32;
     let hf = height.max(1) as f32;
@@ -301,7 +328,7 @@ pub fn generate_motion_frame(
             let v = ((wave_x + wave_y + diag) / 3.0) * 0.5 + 0.5; // 0.0 .. 1.0
 
             let (r, g, b) = match preset {
-                MotionPreset::Dark(_) => (0, 0, 0),
+                MotionPreset::Dark(_) | MotionPreset::Bokeh(_) => (0, 0, 0),
                 MotionPreset::Aurora => (
                     (12.0 + v * 36.0) as u8,
                     (22.0 + v * 92.0 * (1.0 - ny * 0.4)) as u8,
@@ -377,6 +404,91 @@ fn generate_dark_frame(width: u32, height: u32, t_secs: f32, m: &DarkMotion) -> 
     pixels
 }
 
+/// Hash determinístico (0..1) para espalhar as partículas sem depender de aleatoriedade.
+fn hash01(i: u32, salt: u32) -> f32 {
+    let mut x = i.wrapping_mul(0x9E37_79B1) ^ salt.wrapping_mul(0x85EB_CA77);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2C1B_3C6D);
+    x ^= x >> 12;
+    (x & 0x00FF_FFFF) as f32 / 16_777_216.0
+}
+
+/// Frame bokeh em loop. Cada partícula sobe de forma linear por um número inteiro de alturas de tela
+/// por ciclo e balança em seno com período do ciclo; assim o frame em `t + LOOP` é igual ao de `t`.
+fn generate_bokeh_frame(width: u32, height: u32, t_secs: f32, style: &BokehStyle) -> Vec<u8> {
+    let w = width.max(1) as f32;
+    let h = height.max(1) as f32;
+    let phase = t_secs.rem_euclid(MOTION_LOOP_SECS) / MOTION_LOOP_SECS;
+    let tau = std::f32::consts::TAU;
+
+    // Acumulador de brilho das partículas.
+    let mut acc = vec![0.0f32; (width as usize) * (height as usize) * 3];
+
+    for i in 0..style.count {
+        let bx = hash01(i, 1);
+        let by = hash01(i, 2);
+        let depth = hash01(i, 3); // 0 = longe (pequena, lenta), 1 = perto (grande, rápida)
+        let sparkle = hash01(i, 4) < 0.18;
+        let radius = if sparkle { 0.006 } else { 0.014 + depth * 0.040 } * h;
+        let bright = if sparkle { 1.0 } else { 0.10 + depth * 0.24 };
+        let speed = if !sparkle && depth > 0.6 { 2.0 } else { 1.0 }; // alturas de tela por ciclo (inteiro)
+        let sway_amp = 0.012 + 0.02 * hash01(i, 5);
+        let sway_ph = tau * hash01(i, 6);
+
+        let cx = (bx + sway_amp * (tau * phase + sway_ph).sin()).rem_euclid(1.0) * w;
+        let cy0 = (by - phase * speed).rem_euclid(1.0) * h;
+
+        // Desenha cópias em y-h, y, y+h para o disco atravessar a borda sem cortar.
+        for k in -1..=1 {
+            let cy = cy0 + k as f32 * h;
+            let r = radius;
+            let x_min = (cx - r).floor().max(0.0) as u32;
+            let x_max = (cx + r).ceil().min(w - 1.0) as u32;
+            let y_min = (cy - r).floor().max(0.0) as u32;
+            let y_max = (cy + r).ceil().min(h - 1.0) as u32;
+            if x_min > x_max || y_min > y_max {
+                continue;
+            }
+            for py in y_min..=y_max {
+                let dy = py as f32 + 0.5 - cy;
+                for px in x_min..=x_max {
+                    let dx = px as f32 + 0.5 - cx;
+                    let d = (dx * dx + dy * dy).sqrt() / r;
+                    if d >= 1.0 {
+                        continue;
+                    }
+                    // Disco com borda levemente mais clara (bokeh) e centro suave.
+                    let edge = ((d - 0.85) / 0.15).clamp(0.0, 1.0);
+                    let v = bright * (1.0 - d * d) * (0.75 + 0.5 * edge);
+                    let idx = ((py * width + px) * 3) as usize;
+                    acc[idx] += v;
+                    acc[idx + 1] += v;
+                    acc[idx + 2] += v;
+                }
+            }
+        }
+    }
+
+    let mut pixels = vec![0u8; (width as usize) * (height as usize) * 4];
+    for y in 0..height {
+        let ny = y as f32 / h;
+        let grad = ((ny - 0.15) / 0.85).clamp(0.0, 1.0);
+        let grad = grad * grad * (3.0 - 2.0 * grad); // smoothstep
+        for x in 0..width {
+            let p = (y * width + x) as usize;
+            let a = acc[p * 3];
+            let idx = p * 4;
+            for c in 0..3 {
+                let base = style.top[c] + (style.bottom[c] - style.top[c]) * grad;
+                let v = base + style.tint[c] * a.min(1.0);
+                pixels[idx + c] = v.clamp(0.0, 255.0) as u8;
+            }
+            pixels[idx + 3] = 255;
+        }
+    }
+    pixels
+}
+
 #[cfg(test)]
 mod motion_loop_tests {
     use super::*;
@@ -395,6 +507,19 @@ mod motion_loop_tests {
     fn dark_motions_resolve_by_uri() {
         for (i, m) in DARK_MOTIONS.iter().enumerate() {
             assert!(matches!(MotionPreset::from_uri(m.uri), MotionPreset::Dark(j) if j == i));
+        }
+    }
+
+    #[test]
+    fn bokeh_styles_loop_seamlessly() {
+        for i in 0..BOKEH_STYLES.len() {
+            let p = MotionPreset::Bokeh(i);
+            let a = generate_motion_frame(64, 36, 7.0, p);
+            let b = generate_motion_frame(64, 36, 7.0 + MOTION_LOOP_SECS, p);
+            assert_eq!(a, b, "bokeh {} não fecha o ciclo", BOKEH_STYLES[i].uri);
+        }
+        for (i, b) in BOKEH_STYLES.iter().enumerate() {
+            assert!(matches!(MotionPreset::from_uri(b.uri), MotionPreset::Bokeh(j) if j == i));
         }
     }
 
