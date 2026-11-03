@@ -972,33 +972,72 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             else {
                 return;
             };
-            let c = ctx.borrow();
-            let status = match parse_txt_directory(&folder, "user_txt", DEFAULT_MAX_LINE_CHARS) {
-                Ok((songs, report)) => {
-                    // Lote em uma transação, com grupo automático por artista.
-                    let bulk = c.rt.block_on(c.storage.import_songs_bulk(&songs, true));
-                    let (db_inserted, db_skipped) = match &bulk {
-                        Ok(r) => (r.inserted, r.skipped_duplicates),
-                        Err(_) => (0, 0),
-                    };
-                    format!(
-                        "Importação TXT concluída: {} músicas | {} com quebra automática (>38c) | {} duplicatas ignoradas",
-                        db_inserted,
-                        report.forced_break_songs,
-                        report.exact_duplicates_removed + db_skipped
-                    )
-                }
-                Err(e) => format!("Erro ao importar pasta TXT: {e}"),
+            // Importação em segundo plano: lê os arquivos e grava em lotes de 5 mil,
+            // atualizando a barra de status a cada lote. A interface continua respondendo.
+            let (storage, rt) = {
+                let c = ctx.borrow();
+                (c.storage.clone(), c.rt.clone())
             };
             if let Some(w) = ui_weak.upgrade() {
-                refresh_songs_ui(
-                    &w,
-                    &c,
-                    w.get_library_search_query().as_str(),
-                    w.get_show_archived(),
-                );
-                w.set_status_banner(status.into());
+                w.set_status_banner("Lendo pasta de letras...".into());
             }
+            let weak = ui_weak.clone();
+            std::thread::spawn(move || {
+                let parsed = parse_txt_directory(&folder, "user_txt", DEFAULT_MAX_LINE_CHARS);
+                let (songs, report) = match parsed {
+                    Ok(x) => x,
+                    Err(e) => {
+                        let msg = format!("Erro ao importar pasta TXT: {e}");
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = weak.upgrade() {
+                                w.set_status_banner(msg.into());
+                            }
+                        });
+                        return;
+                    }
+                };
+                let total = songs.len();
+                let mut inserted = 0usize;
+                let mut skipped = 0usize;
+                for (i, chunk) in songs.chunks(5_000).enumerate() {
+                    match rt.block_on(storage.import_songs_bulk(chunk, true)) {
+                        Ok(r) => {
+                            inserted += r.inserted;
+                            skipped += r.skipped_duplicates;
+                        }
+                        Err(e) => {
+                            let msg = format!("Erro ao gravar lote {}: {e}", i + 1);
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = weak.upgrade() {
+                                    w.set_status_banner(msg.into());
+                                }
+                            });
+                            return;
+                        }
+                    }
+                    let done = ((i + 1) * 5_000).min(total);
+                    let progress = format!("Importando letras: {done} de {total}...");
+                    let w2 = weak.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = w2.upgrade() {
+                            w.set_status_banner(progress.into());
+                        }
+                    });
+                }
+                let final_msg = format!(
+                    "Importação TXT concluída: {inserted} músicas | {} com quebra automática (>38c) | {} duplicatas ignoradas",
+                    report.forced_break_songs,
+                    report.exact_duplicates_removed + skipped
+                );
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = weak.upgrade() {
+                        w.set_status_banner(final_msg.into());
+                        // Atualiza a lista pelo próprio callback de busca (passa pelo contexto da UI).
+                        let q = w.get_library_search_query().to_string();
+                        w.invoke_search_songs(q.into());
+                    }
+                });
+            });
         });
     }
     {
