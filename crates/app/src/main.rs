@@ -247,7 +247,7 @@ fn main() -> Result<()> {
         .block_on(storage.list_bible_versions())
         .unwrap_or_default();
 
-    let media_engine = MediaEngine::spawn(960, 540);
+    let media_engine = MediaEngine::spawn(1920, 1080);
     if let Some(main_t) = themes.iter().find(|t| t.id == initial_theme_id)
         && let BackgroundSpec::Video {
             path,
@@ -572,6 +572,17 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_toggle_auto_play_repeat(move |repeat| {
+            let mut c = ctx.borrow_mut();
+            c.engine.dispatch(CoreCommand::SetAutoPlayRepeat { repeat });
+            if let Some(w) = ui_weak.upgrade() {
+                sync_output_state_to_ui(&w, &mut c);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_toggle_auto_play(move |enabled| {
             let mut c = ctx.borrow_mut();
             let dur = c.settings.auto_advance_default_secs.or(Some(6));
@@ -622,6 +633,31 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             let c = ctx.borrow();
             if let Some(w) = ui_weak.upgrade() {
                 refresh_songs_ui(&w, &c, w.get_library_search_query().as_str(), show_arch);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_library_step(move |delta| {
+            use slint::Model;
+            let mut c = ctx.borrow_mut();
+            let Some(w) = ui_weak.upgrade() else {
+                return;
+            };
+            let model = w.get_songs_list();
+            let ids: Vec<i32> = (0..model.row_count())
+                .filter_map(|i| model.row_data(i).map(|r| r.song_id))
+                .collect();
+            if ids.is_empty() {
+                return;
+            }
+            let current = w.get_selected_song_id();
+            let pos = ids.iter().position(|id| *id == current).map(|p| p as i32).unwrap_or(-1);
+            let next = (pos + delta).clamp(0, ids.len() as i32 - 1) as usize;
+            let song_id = ids[next];
+            if let Ok(Some(song)) = c.rt.block_on(c.storage.get_song(song_id as i64)) {
+                stage_and_optionally_project_song(&w, &mut c, song, false, 0);
             }
         });
     }
@@ -961,41 +997,72 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             else {
                 return;
             };
-            let c = ctx.borrow();
-            let status = match parse_txt_directory(&folder, "user_txt", DEFAULT_MAX_LINE_CHARS) {
-                Ok((songs, report)) => {
-                    let mut db_inserted = 0usize;
-                    let mut db_skipped = 0usize;
-                    for s in &songs {
-                        if let Ok(outcome) = c.rt.block_on(c.storage.insert_song(s, true)) {
-                            match outcome {
-                                overture_storage::SongInsertOutcome::Inserted { .. } => {
-                                    db_inserted += 1
-                                }
-                                overture_storage::SongInsertOutcome::SkippedExactDuplicate {
-                                    ..
-                                } => db_skipped += 1,
-                            }
-                        }
-                    }
-                    format!(
-                        "Importação TXT concluída: {} músicas | {} com quebra automática (>38c) | {} duplicatas ignoradas",
-                        db_inserted,
-                        report.forced_break_songs,
-                        report.exact_duplicates_removed + db_skipped
-                    )
-                }
-                Err(e) => format!("Erro ao importar pasta TXT: {e}"),
+            // Importação em segundo plano: lê os arquivos e grava em lotes de 5 mil,
+            // atualizando a barra de status a cada lote. A interface continua respondendo.
+            let (storage, rt) = {
+                let c = ctx.borrow();
+                (c.storage.clone(), c.rt.clone())
             };
             if let Some(w) = ui_weak.upgrade() {
-                refresh_songs_ui(
-                    &w,
-                    &c,
-                    w.get_library_search_query().as_str(),
-                    w.get_show_archived(),
-                );
-                w.set_status_banner(status.into());
+                w.set_status_banner("Lendo pasta de letras...".into());
             }
+            let weak = ui_weak.clone();
+            std::thread::spawn(move || {
+                let parsed = parse_txt_directory(&folder, "user_txt", DEFAULT_MAX_LINE_CHARS);
+                let (songs, report) = match parsed {
+                    Ok(x) => x,
+                    Err(e) => {
+                        let msg = format!("Erro ao importar pasta TXT: {e}");
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = weak.upgrade() {
+                                w.set_status_banner(msg.into());
+                            }
+                        });
+                        return;
+                    }
+                };
+                let total = songs.len();
+                let mut inserted = 0usize;
+                let mut skipped = 0usize;
+                for (i, chunk) in songs.chunks(5_000).enumerate() {
+                    match rt.block_on(storage.import_songs_bulk(chunk, true)) {
+                        Ok(r) => {
+                            inserted += r.inserted;
+                            skipped += r.skipped_duplicates;
+                        }
+                        Err(e) => {
+                            let msg = format!("Erro ao gravar lote {}: {e}", i + 1);
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = weak.upgrade() {
+                                    w.set_status_banner(msg.into());
+                                }
+                            });
+                            return;
+                        }
+                    }
+                    let done = ((i + 1) * 5_000).min(total);
+                    let progress = format!("Importando letras: {done} de {total}...");
+                    let w2 = weak.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = w2.upgrade() {
+                            w.set_status_banner(progress.into());
+                        }
+                    });
+                }
+                let final_msg = format!(
+                    "Importação TXT concluída: {inserted} músicas | {} com quebra automática (>38c) | {} duplicatas ignoradas",
+                    report.forced_break_songs,
+                    report.exact_duplicates_removed + skipped
+                );
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = weak.upgrade() {
+                        w.set_status_banner(final_msg.into());
+                        // Atualiza a lista pelo próprio callback de busca (passa pelo contexto da UI).
+                        let q = w.get_library_search_query().to_string();
+                        w.invoke_search_songs(q.into());
+                    }
+                });
+            });
         });
     }
     {
@@ -1049,6 +1116,31 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             };
             if let Some(w) = ui_weak.upgrade() {
                 refresh_bible_studio_ui(&w, &mut c);
+                w.set_status_banner(msg.into());
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_dialog_export_slides(move || {
+            let Some(out_dir) = rfd::FileDialog::new()
+                .set_title("Escolher Pasta para Exportar Slides em PNG")
+                .pick_folder()
+            else {
+                return;
+            };
+            let mut c = ctx.borrow_mut();
+            let st = c.engine.snapshot();
+            let msg = match st.current_item.clone() {
+                None => "Nenhum item ao vivo para exportar.".to_string(),
+                Some(item) if item.slides.is_empty() => "O item atual não tem slides.".to_string(),
+                Some(item) => match export_item_slides_png(&mut c.preview_compositor, &st, &item.title, &out_dir) {
+                    Ok(n) => format!("{n} slides exportados em PNG para {}", out_dir.display()),
+                    Err(e) => format!("Falha ao exportar slides: {e}"),
+                },
+            };
+            if let Some(w) = ui_weak.upgrade() {
                 w.set_status_banner(msg.into());
             }
         });
@@ -1216,6 +1308,43 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
+        ui.on_create_recurring_services(move || {
+            let mut c = ctx.borrow_mut();
+            let weekday = c.settings.recurring_weekday;
+            let name = c.settings.recurring_service_name.clone();
+            let today = chrono::Local::now().date_naive();
+            let dates = overture_core::next_weekly_dates(today, weekday, 8);
+            let existing: std::collections::HashSet<String> = c
+                .rt
+                .block_on(c.storage.list_services(true))
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|s| s.name == name)
+                .map(|s| s.date)
+                .collect();
+            let mut created = Vec::new();
+            for d in dates {
+                let iso = d.format("%Y-%m-%d").to_string();
+                if existing.contains(&iso) {
+                    continue;
+                }
+                if c.rt.block_on(c.storage.create_service(&iso, &name)).is_ok() {
+                    created.push(d.format("%d/%m").to_string());
+                }
+            }
+            if let Some(w) = ui_weak.upgrade() {
+                let msg = if created.is_empty() {
+                    "Nenhum culto novo: as datas recorrentes já existem.".to_string()
+                } else {
+                    format!("{} cultos recorrentes criados: {}", created.len(), created.join(", "))
+                };
+                w.set_status_banner(msg.into());
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
         ui.on_activate_playlist_item(move |row_idx| {
             if row_idx < 0 {
                 return;
@@ -1288,12 +1417,20 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             if dst < 0 || dst >= len || dst == row_idx {
                 return;
             }
+            // Move em passos de vizinho em vizinho: o item é inserido na nova posição.
+            let step = if dst > row_idx { 1 } else { -1 };
+            let steps = (dst - row_idx).abs();
+            let mut apply_swaps = |items: &mut Vec<overture_core::ServiceItem>| {
+                let mut cur = row_idx;
+                for _ in 0..steps {
+                    items.swap(cur as usize, (cur + step) as usize);
+                    cur += step;
+                }
+            };
             if c.using_temp_service {
-                c.temp_service.items.swap(row_idx as usize, dst as usize);
+                apply_swaps(&mut c.temp_service.items);
             } else {
-                c.persistent_service
-                    .items
-                    .swap(row_idx as usize, dst as usize);
+                apply_swaps(&mut c.persistent_service.items);
                 let svc_id = c.persistent_service.id;
                 let items = c.persistent_service.items.clone();
                 if let Ok(saved) = c.rt.block_on(c.storage.replace_service_items(svc_id, &items)) {
@@ -1784,6 +1921,17 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
     }
 
     // ==================== HOLYRICS 66-BOOK BIBLE STUDIO ====================
+    {
+        let ui_weak = ui.as_weak();
+        let ctx = ctx.clone();
+        ui.on_bible_toggle_compare(move || {
+            let mut c = ctx.borrow_mut();
+            if let Some(w) = ui_weak.upgrade() {
+                w.set_bible_compare_on(!w.get_bible_compare_on());
+                refresh_bible_compare(&w, &mut c);
+            }
+        });
+    }
     {
         let ui_weak = ui.as_weak();
         let ctx = ctx.clone();
@@ -2650,6 +2798,39 @@ fn update_active_theme_indicator(ui: &MainWindow, c: &mut AppContext) {
     }
 }
 
+/// Texto de comparação: o versículo ativo em todas as versões instaladas.
+fn refresh_bible_compare(ui: &MainWindow, c: &mut AppContext) {
+    if !ui.get_bible_compare_on() {
+        ui.set_bible_compare_text("".into());
+        return;
+    }
+    let book = ui.get_bible_active_book();
+    let chapter = ui.get_bible_active_chapter();
+    let verse = ui.get_bible_active_verse();
+    if c.bible_versions.is_empty() {
+        c.bible_versions = c
+            .rt
+            .block_on(c.storage.list_bible_versions())
+            .unwrap_or_default();
+    }
+    let mut blocks = Vec::new();
+    for v in c.bible_versions.clone() {
+        let verses = c
+            .rt
+            .block_on(c.storage.list_bible_chapter_verses(v.id, book, chapter))
+            .unwrap_or_default();
+        if let Some(found) = verses.iter().find(|x| x.verse == verse) {
+            blocks.push(format!("{}: {}", v.abbr, found.text));
+        }
+    }
+    let text = if blocks.is_empty() {
+        "Nenhuma versão tem este versículo.".to_string()
+    } else {
+        blocks.join("\n\n")
+    };
+    ui.set_bible_compare_text(text.into());
+}
+
 fn refresh_bible_studio_ui(ui: &MainWindow, c: &mut AppContext) {
     if c.bible_versions.is_empty() {
         c.bible_versions = c
@@ -2696,6 +2877,7 @@ fn refresh_bible_studio_ui(ui: &MainWindow, c: &mut AppContext) {
     }
     ui.set_bible_book_grid_rows(ModelRc::new(VecModel::from(book_rows)));
     ui.set_bible_active_book(c.bible_book_order);
+    refresh_bible_compare(ui, c);
 
     // 2. Chapters Grid (9 columns, padded with 0s for uniform tile widths)
     let ch_count = c
@@ -2853,6 +3035,21 @@ fn refresh_schedule_and_reports_ui(ui: &MainWindow, c: &AppContext, wk_idx: i32)
         None
     };
 
+    if ui.get_report_by_group() {
+        if let Ok(groups) = c.rt.block_on(c.storage.report_plays_by_group(None, None, weekday)) {
+            let rows: Vec<UiReportRow> = groups
+                .into_iter()
+                .map(|(name, count)| UiReportRow {
+                    title: name.into(),
+                    artist: "".into(),
+                    executions: count as i32,
+                })
+                .collect();
+            ui.set_report_rows(ModelRc::new(VecModel::from(rows)));
+        }
+        return;
+    }
+
     if let Ok(stats) = c
         .rt
         .block_on(c.storage.report_most_played_songs(None, None, weekday, 60))
@@ -2875,6 +3072,7 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
     ui.set_is_logo_screen(st.display_mode == DisplayMode::Logo);
     ui.set_is_clear_text(st.display_mode == DisplayMode::ClearText);
     ui.set_auto_play_enabled(st.auto_play_enabled);
+    ui.set_auto_play_repeat(st.auto_play_repeat);
     ui.set_stage_timer_display(st.formatted_stage_timer().into());
     ui.set_scoreboard_visible(st.scoreboard.visible);
     ui.set_team_a_score(st.scoreboard.team_a_score);
@@ -3015,6 +3213,10 @@ fn populate_theme_editor_fields(ui: &MainWindow, t: &Theme) {
     ui.set_theme_font_size(format!("{}", t.config.font_size as u32).into());
     ui.set_theme_text_color(t.config.text_color.to_hex().into());
     ui.set_theme_shadow_enabled(t.config.shadow.enabled);
+    ui.set_theme_italic(t.config.italic);
+    ui.set_theme_glow(t.config.glow.enabled);
+    ui.set_theme_clock(t.config.show_clock);
+    ui.set_theme_uppercase(t.config.uppercase);
     ui.set_theme_is_return(t.is_return_theme);
     ui.set_theme_align_index(match t.config.h_align {
         HorizontalAlign::Left => 0,
@@ -3055,6 +3257,16 @@ fn read_theme_config_from_ui(ui: &MainWindow) -> ThemeConfig {
         cfg.text_color = col;
     }
     cfg.shadow.enabled = ui.get_theme_shadow_enabled();
+    cfg.italic = ui.get_theme_italic();
+    cfg.show_clock = ui.get_theme_clock();
+    cfg.uppercase = ui.get_theme_uppercase();
+    if ui.get_theme_glow() {
+        cfg.glow = overture_core::GlowSpec {
+            enabled: true,
+            color: RgbaColor::new(255, 255, 255, 170),
+            radius: 6.0,
+        };
+    }
     cfg.h_align = match ui.get_theme_align_index() {
         0 => HorizontalAlign::Left,
         2 => HorizontalAlign::Right,
@@ -3443,6 +3655,16 @@ async fn seed_initial_demo_data_if_empty(storage: &Storage) -> Result<()> {
         ("Motion — Aurora Boreal", "motion://aurora"),
         ("Motion — Oceano Profundo", "motion://ocean"),
         ("Motion — Âmbar Dourado", "motion://warm"),
+        ("Motion — Bokeh Azul-Petróleo", "motion://bokeh-teal"),
+        ("Motion — Bokeh Grafite", "motion://bokeh-graphite"),
+        ("Motion — Bokeh Violeta", "motion://bokeh-violet"),
+        ("Motion — Bokeh Brasa Apagada", "motion://bokeh-ember"),
+        ("Motion — Ondas Azul-Petróleo", "motion://wave-teal"),
+        ("Motion — Ondas Índigo", "motion://wave-indigo"),
+        ("Motion — Ondas Ameixa", "motion://wave-plum"),
+        ("Motion — Ondas Musgo", "motion://wave-moss"),
+        ("Motion — Ondas Ardósia", "motion://wave-slate"),
+        ("Motion — Ondas Brasa", "motion://wave-ember"),
     ] {
         storage
             .upsert_media(&MediaItem {
@@ -3502,4 +3724,29 @@ async fn seed_initial_demo_data_if_empty(storage: &Storage) -> Result<()> {
         .await?;
 
     Ok(())
+}
+
+/// Renderiza cada slide do item ao vivo em 1920×1080 (saída principal) e salva como PNG.
+fn export_item_slides_png(
+    compositor: &mut SlideCompositor,
+    st: &overture_core::OutputState,
+    item_title: &str,
+    out_dir: &std::path::Path,
+) -> anyhow::Result<usize> {
+    let slide_count = st.current_item.as_ref().map(|i| i.slides.len()).unwrap_or(0);
+    let safe_title: String = item_title
+        .chars()
+        .map(|ch| if r#":<>"|?*/\\"#.contains(ch) { '-' } else { ch })
+        .collect();
+    for i in 0..slide_count {
+        let mut s2 = st.clone();
+        s2.current_slide_index = i;
+        s2.display_mode = overture_core::DisplayMode::Normal;
+        let frame = compositor.compose(&s2, OutputRole::Main, 1920, 1080, None);
+        let img = image::RgbaImage::from_raw(frame.width, frame.height, frame.pixels)
+            .ok_or_else(|| anyhow::anyhow!("buffer de imagem inválido"))?;
+        let path = out_dir.join(format!("{:02} - {}.png", i + 1, safe_title.trim()));
+        img.save(&path)?;
+    }
+    Ok(slide_count)
 }

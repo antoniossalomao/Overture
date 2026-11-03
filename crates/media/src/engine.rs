@@ -1,4 +1,5 @@
 use crate::libmpv_ffi::{LibMpvPlayer, probe_libmpv_path};
+use crate::motion::{MotionPreset, generate_motion_frame, motion_video_path};
 use overture_core::MediaKind;
 use overture_render::SharedVideoFrame;
 use std::sync::mpsc::{self, Sender};
@@ -24,26 +25,6 @@ pub enum MediaCommand {
     SetVolume(u8),
     Stop,
     Shutdown,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MotionPreset {
-    Aurora,
-    Ocean,
-    WarmGold,
-}
-
-impl MotionPreset {
-    pub fn from_uri(uri: &str) -> Self {
-        let lower = uri.to_ascii_lowercase();
-        if lower.contains("ocean") || lower.contains("agua") {
-            Self::Ocean
-        } else if lower.contains("warm") || lower.contains("gold") || lower.contains("fogo") {
-            Self::WarmGold
-        } else {
-            Self::Aurora
-        }
-    }
 }
 
 /// Asynchronous media engine driving `libmpv` video/audio playback and procedural motion backgrounds,
@@ -83,9 +64,10 @@ impl MediaEngine {
                 let mut active_mode: ActivePlayback = ActivePlayback::Idle;
                 let mut paused = false;
                 let start_instant = Instant::now();
-                let frame_interval = Duration::from_millis(33); // ~30 fps smooth video background
+                let frame_interval = Duration::from_micros(33_333); // 30 fps
 
                 loop {
+                    let frame_start = Instant::now();
                     while let Ok(cmd) = cmd_rx.try_recv() {
                         match cmd {
                             MediaCommand::PlayBackgroundVideo {
@@ -93,7 +75,29 @@ impl MediaEngine {
                                 loop_playback,
                             } => {
                                 paused = false;
-                                if path.starts_with("motion://") || mpv.is_none() {
+                                // Estilos `motion://` têm vídeo exportado (`assets/motion/<nome>.mp4`): tocar via
+                                // libmpv em loop, sem custo de geração em CPU. Sem o arquivo ou sem libmpv,
+                                // cai no gerador procedural.
+                                let motion_file = if path.starts_with("motion://") {
+                                    motion_video_path(&path)
+                                } else {
+                                    None
+                                };
+                                let played_video = match (&mut mpv, &motion_file) {
+                                    (Some(p), Some(file)) => match p.load_file(&file.to_string_lossy(), true, true) {
+                                        Ok(()) => {
+                                            active_mode = ActivePlayback::MpvVideo;
+                                            true
+                                        }
+                                        Err(e) => {
+                                            warn!("libmpv falhou em {}: {}; usando gerador", file.display(), e);
+                                            false
+                                        }
+                                    },
+                                    _ => false,
+                                };
+                                if played_video {
+                                } else if path.starts_with("motion://") || mpv.is_none() {
                                     if let Some(p) = &mut mpv {
                                         p.stop();
                                     }
@@ -201,7 +205,8 @@ impl MediaEngine {
                         }
                     }
 
-                    std::thread::sleep(frame_interval);
+                    // Cadência fixa de ~30 fps: desconta o tempo gasto gerando o frame.
+                    std::thread::sleep(frame_interval.saturating_sub(frame_start.elapsed()));
                 }
             })
             .expect("spawn media engine thread");
@@ -238,52 +243,3 @@ enum ActivePlayback {
     Procedural(MotionPreset),
 }
 
-/// Generates a smooth, atmospheric RGBA worship motion-background frame at `(width, height)`.
-pub fn generate_motion_frame(
-    width: u32,
-    height: u32,
-    t_secs: f32,
-    preset: MotionPreset,
-) -> Vec<u8> {
-    let mut pixels = vec![0u8; (width as usize) * (height as usize) * 4];
-    let wf = width.max(1) as f32;
-    let hf = height.max(1) as f32;
-
-    for y in 0..height {
-        let ny = y as f32 / hf;
-        let wave_y = (ny * 4.2 + t_secs * 0.65).sin();
-        let row_offset = (y * width) as usize * 4;
-
-        for x in 0..width {
-            let nx = x as f32 / wf;
-            let wave_x = (nx * 5.0 - t_secs * 0.8).cos();
-            let diag = ((nx + ny) * 3.5 + t_secs * 0.5).sin();
-            let v = ((wave_x + wave_y + diag) / 3.0) * 0.5 + 0.5; // 0.0 .. 1.0
-
-            let (r, g, b) = match preset {
-                MotionPreset::Aurora => (
-                    (12.0 + v * 36.0) as u8,
-                    (22.0 + v * 92.0 * (1.0 - ny * 0.4)) as u8,
-                    (48.0 + v * 135.0) as u8,
-                ),
-                MotionPreset::Ocean => (
-                    (6.0 + v * 22.0) as u8,
-                    (34.0 + v * 85.0) as u8,
-                    (68.0 + v * 145.0) as u8,
-                ),
-                MotionPreset::WarmGold => (
-                    (42.0 + v * 125.0) as u8,
-                    (22.0 + v * 72.0) as u8,
-                    (10.0 + v * 28.0) as u8,
-                ),
-            };
-
-            let idx = row_offset + (x as usize * 4);
-            pixels[idx] = r;
-            pixels[idx + 1] = g;
-            pixels[idx + 2] = b;
-            pixels[idx + 3] = 255;
-        }
-    }
-    pixels
-}

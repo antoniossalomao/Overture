@@ -10,12 +10,12 @@ export component ShadBadge inherits Rectangle {
     border-radius: 4px;
     border-width: 1px;
     background: root.variant == "default" ? ShadTheme.primary :
-                root.variant == "sky" ? #082f49 :
+                root.variant == "sky" ? #0f1320 :
                 root.variant == "amber" ? ShadTheme.amber-bg :
                 root.variant == "emerald" ? ShadTheme.emerald-bg :
                 root.variant == "outline" ? transparent : ShadTheme.muted;
     border-color: root.variant == "default" ? ShadTheme.primary :
-                  root.variant == "sky" ? #0369a1 :
+                  root.variant == "sky" ? #8fa0d0 :
                   root.variant == "amber" ? ShadTheme.amber-border :
                   root.variant == "emerald" ? ShadTheme.emerald-border : ShadTheme.border;
 
@@ -25,13 +25,13 @@ export component ShadBadge inherits Rectangle {
         alignment: center;
         Text {
             text: root.text;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
             vertical-alignment: center;
             color: root.variant == "default" ? ShadTheme.primary-fg :
-                   root.variant == "sky" ? #7dd3fc :
-                   root.variant == "amber" ? #fcd34d :
-                   root.variant == "emerald" ? #6ee7b7 : ShadTheme.fg-muted;
+                   root.variant == "sky" ? #b9c6ea :
+                   root.variant == "amber" ? #e9b467 :
+                   root.variant == "emerald" ? #74cfae : ShadTheme.fg-muted;
         }
     }
 }
@@ -52,14 +52,14 @@ export component ShadButton inherits Rectangle {
                   root.variant == "destructive" ? ShadTheme.destructive-border :
                   root.variant == "outline" ? ShadTheme.border-strong : ShadTheme.border;
 
-    background: root.disabled ? #18181b80 :
+    background: root.disabled ? #1b1c1f80 :
                 root.active ? ShadTheme.live-blue :
-                root.variant == "default" ? (ta.pressed ? #d4d4d8 : ta.has-hover ? ShadTheme.primary-hover : ShadTheme.primary) :
-                root.variant == "sky" ? (ta.pressed ? #0369a1 : ta.has-hover ? ShadTheme.live-blue-hover : ShadTheme.live-blue) :
+                root.variant == "default" ? (ta.pressed ? #d6d8de : ta.has-hover ? ShadTheme.primary-hover : ShadTheme.primary) :
+                root.variant == "sky" ? (ta.pressed ? #8fa0d0 : ta.has-hover ? ShadTheme.live-blue-hover : ShadTheme.live-blue) :
                 root.variant == "destructive" ? (ta.has-hover ? ShadTheme.destructive-hover : ShadTheme.destructive-bg) :
                 root.variant == "outline" ? (ta.has-hover ? ShadTheme.accent : ShadTheme.bg-bar) :
                 root.variant == "ghost" ? (ta.has-hover ? ShadTheme.accent : transparent) :
-                (ta.pressed ? #3f3f46 : ta.has-hover ? ShadTheme.accent-hover : ShadTheme.accent);
+                (ta.pressed ? #34363c : ta.has-hover ? ShadTheme.accent-hover : ShadTheme.accent);
 
     animate background { duration: 110ms; }
 
@@ -75,7 +75,7 @@ export component ShadButton inherits Rectangle {
                 name: root.icon;
                 icon-size: root.size == "xs" ? 12px : 13px;
                 tint: root.variant == "default" && !root.active ? ShadTheme.primary-fg :
-                      root.variant == "destructive" ? #fecaca : ShadTheme.fg;
+                      root.variant == "destructive" ? #f5c2c8 : ShadTheme.fg;
             }
         }
         if root.label != "" : Text {
@@ -85,7 +85,7 @@ export component ShadButton inherits Rectangle {
             vertical-alignment: center;
             color: root.disabled ? ShadTheme.fg-subtle :
                    root.variant == "default" && !root.active ? ShadTheme.primary-fg :
-                   root.variant == "destructive" ? #fecaca : ShadTheme.fg;
+                   root.variant == "destructive" ? #f5c2c8 : ShadTheme.fg;
         }
     }
 
@@ -121,7 +121,7 @@ export component ShadIconButton inherits Rectangle {
         name: root.icon;
         icon-size: root.icon-px;
         tint: root.active ? #ffffff :
-              root.danger && ta.has-hover ? #fca5a5 :
+              root.danger && ta.has-hover ? #f07c88 :
               ta.has-hover ? ShadTheme.fg :
               root.subtle ? ShadTheme.fg-subtle : ShadTheme.fg-muted;
     }
@@ -206,7 +206,7 @@ export component ShadInput inherits Rectangle {
                 height: 100%;
                 text: root.placeholder;
                 color: ShadTheme.fg-subtle;
-                font-size: 11.5px;
+                font-size: 12px;
                 vertical-alignment: center;
                 overflow: elide;
             }
@@ -254,7 +254,7 @@ export component ShadInput inherits Rectangle {
                     padding-right: 5px;
                     Text {
                         text: root.kbd-hint;
-                        font-size: 9.5px;
+                        font-size: 11px;
                         color: ShadTheme.fg-subtle;
                         vertical-alignment: center;
                     }
@@ -337,7 +337,7 @@ export component ShadSwitch inherits HorizontalLayout {
                 width: 12px;
                 height: 12px;
                 border-radius: 6px;
-                background: root.checked ? #052e16 : ShadTheme.fg;
+                background: root.checked ? #17271f : ShadTheme.fg;
                 animate x { duration: 140ms; easing: ease-out; }
             }
 
@@ -408,7 +408,7 @@ export component ShadCheckbox inherits HorizontalLayout {
         alignment: center;
         Text {
             text: root.label;
-            font-size: 11.5px;
+            font-size: 12px;
             color: ShadTheme.fg-secondary;
             vertical-alignment: center;
             TouchArea {
@@ -485,7 +485,7 @@ export component ShadSelect inherits Rectangle {
             horizontal-stretch: 1;
             text: root.current-value != "" ? root.current-value :
                   (root.current-index >= 0 && root.current-index < root.model.length ? root.model[root.current-index] : "—");
-            font-size: 11.5px;
+            font-size: 12px;
             color: ShadTheme.fg;
             vertical-alignment: center;
             overflow: elide;
@@ -536,7 +536,7 @@ export component ShadSelect inherits Rectangle {
                         Text {
                             horizontal-stretch: 1;
                             text: item;
-                            font-size: 11.5px;
+                            font-size: 12px;
                             color: ShadTheme.fg;
                             vertical-alignment: center;
                             overflow: elide;

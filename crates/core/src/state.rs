@@ -78,6 +78,8 @@ pub struct OutputState {
     pub current_slide_index: usize,
     pub auto_play_enabled: bool,
     pub auto_play_elapsed_secs: u32,
+    /// Repetir do início ao fim da lista na apresentação automática. Se desligado, para no último slide.
+    pub auto_play_repeat: bool,
     pub default_slide_duration_secs: u32,
     pub countdown: CountdownState,
     pub scoreboard: ScoreboardState,
@@ -99,6 +101,7 @@ impl Default for OutputState {
             current_slide_index: 0,
             auto_play_enabled: false,
             auto_play_elapsed_secs: 0,
+            auto_play_repeat: true,
             default_slide_duration_secs: 6,
             countdown: CountdownState::default(),
             scoreboard: ScoreboardState::default(),
@@ -182,6 +185,9 @@ pub enum CoreCommand {
     SetAutoPlay {
         enabled: bool,
         default_duration_secs: Option<u32>,
+    },
+    SetAutoPlayRepeat {
+        repeat: bool,
     },
     StartCountdown {
         label: String,
@@ -402,6 +408,9 @@ impl StateEngine {
                         st.default_slide_duration_secs = d.max(1);
                     }
                 }
+                CoreCommand::SetAutoPlayRepeat { repeat } => {
+                    st.auto_play_repeat = repeat;
+                }
                 CoreCommand::StartCountdown {
                     label,
                     seconds,
@@ -485,6 +494,10 @@ impl StateEngine {
                 }
                 CoreCommand::TickSecond => {
                     changed = false;
+                    // Relógio na saída: redesenha a cada segundo quando ativo.
+                    if st.main_theme.show_clock {
+                        changed = true;
+                    }
                     if st.countdown.active {
                         if st.countdown.remaining_secs > 0 {
                             st.countdown.remaining_secs -= 1;
@@ -517,7 +530,12 @@ impl StateEngine {
                             st.auto_play_elapsed_secs += 1;
                             if st.auto_play_elapsed_secs >= target_dur {
                                 st.auto_play_elapsed_secs = 0;
-                                st.current_slide_index = (st.current_slide_index + 1) % slides_len;
+                                let at_end = st.current_slide_index + 1 >= slides_len;
+                                if at_end && !st.auto_play_repeat {
+                                    st.auto_play_enabled = false;
+                                } else {
+                                    st.current_slide_index = (st.current_slide_index + 1) % slides_len;
+                                }
                                 changed = true;
                             }
                         }

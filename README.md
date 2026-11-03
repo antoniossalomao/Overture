@@ -31,9 +31,25 @@ Aplicativo desktop nativo **100% Rust puro** (zero JavaScript / WebView2) para *
   - Navegação visual instantânea por grade Livro → Capítulo → Versículo, busca por referência (`João 3:16`, `Sl 23:1-6`) e por palavras-chave, favoritos e histórico de leitura.
 - **Controle Remoto Mobile na Rede Local (`crates/control`)**
   - Servidor `axum` HTTP + WebSocket restrito à LAN e protegido por token fixo configurável, acompanhado de Web App responsivo para celular (próximo/anterior, tela preta/logo, itens do culto e alerta de palco).
+- **Aparência do Texto e Saída**
+  - Tema com fonte, tamanho, cor, sombra, **itálico**, **brilho (glow)**, **texto em maiúsculas** (padrão no monitor de retorno), fundo sólido/gradiente/imagem/vídeo ou fundo animado.
+  - **Relógio HH:MM** no canto da saída principal e **transição fade** entre slides (duração definida no tema).
+  - Apresentação automática com opção **repetir ou parar no último slide**.
+  - **Atalhos de biblioteca:** Enter projeta a música selecionada, Alt+↑/↓ move a seleção, Enter na busca projeta o primeiro resultado.
+  - **Ordem do culto por arraste:** arraste um item para reordenar; clique curto projeta.
+  - Abas da biblioteca e itens de menu com ícones.
+- **Fundos de Letra Animados (`crates/media`)**
+  - 30 estilos escuros gerados do zero (bokeh, ondas, orbes, raios, névoa, grade, chuva), todos em loop de 24 s a 30 fps.
+  - Tocados em tempo real pelo gerador procedural ou, quando existir `assets/motion/<nome>.mp4`, via libmpv em loop (menos CPU).
+  - Vídeos exportados pelo workflow `.github/workflows/motion-videos.yml` ou pelo exemplo `cargo run --release -p overture-media --example export_motion -- <pasta>` (requer `ffmpeg` com libx264).
+- **Bíblia**
+  - **Comparar versões:** mostra o versículo ativo em todas as versões instaladas.
+  - **Filtros na busca:** `@AT`, `@NT`, `@livro:N` (1–66) e `@cap:N`, combináveis com palavras (ex.: `amor @NT @cap:3`).
 - **Escala, Relatórios, Exportação e Backup Completo**
   - Cadastro de equipe, escalas por culto com contagem de participações e relatórios de músicas mais tocadas por período e por dia da semana.
-  - Exportação em `.txt` e `.json`, além de backup completo (`.zip` contendo snapshot consistente `VACUUM INTO` do SQLite + pasta de mídias) e restauração íntegra.
+  - Exportação em `.txt` e `.json`, **slides do item atual em PNG 1920×1080**, além de backup completo (`.zip` contendo snapshot consistente `VACUUM INTO` do SQLite + pasta de mídias) e restauração íntegra.
+  - **Relatório de execuções por grupo** (alternado com o de músicas mais tocadas).
+  - **Cultos recorrentes:** menu *Novo → Criar próximos 8 cultos recorrentes* cria os próximos cultos no dia da semana configurado (padrão domingo), sem duplicar datas existentes.
 
 ---
 

@@ -1,4 +1,9 @@
-// shadcn/ui Zinc Dark + Holyrics Studio Design System Tokens (100% Pure Slint)
+// Overture design tokens — tema escuro neutro (grafite), alinhado ao Orion (Grafite escuro)
+import "../fonts/geist-sans-latin-400-normal.ttf";
+import "../fonts/geist-sans-latin-500-normal.ttf";
+import "../fonts/geist-sans-latin-600-normal.ttf";
+import "../fonts/geist-mono-latin-400-normal.ttf";
+import "../fonts/geist-mono-latin-500-normal.ttf";
 
 export global UiFocus {
     in-out property <int> active-inputs: 0;
@@ -6,81 +11,81 @@ export global UiFocus {
 
 export global ShadTheme {
     // Core Surfaces (Zinc 950 -> Zinc 800)
-    out property <color> bg: #09090b;
-    out property <color> bg-bar: #0c0c0f;
-    out property <color> panel: #101014;
-    out property <color> card: #131318;
-    out property <color> popover: #0c0c10;
-    out property <color> muted: #18181b;
-    out property <color> muted-hover: #212126;
-    out property <color> accent: #27272a;
-    out property <color> accent-hover: #34343a;
+    out property <color> bg: #151618;
+    out property <color> bg-bar: #111214;
+    out property <color> panel: #1b1c1f;
+    out property <color> card: #1b1c1f;
+    out property <color> popover: #1b1c1f;
+    out property <color> muted: #1e1f22;
+    out property <color> muted-hover: #222327;
+    out property <color> accent: #26272b;
+    out property <color> accent-hover: #2e2f34;
 
     // Borders & Focus Rings
-    out property <color> border: #27272a;
-    out property <color> border-subtle: #1d1d22;
-    out property <color> border-strong: #3f3f46;
-    out property <color> ring: #71717a;
+    out property <color> border: #ffffff1c;
+    out property <color> border-subtle: #ffffff10;
+    out property <color> border-strong: #ffffff33;
+    out property <color> ring: #a4b3de;
 
     // Typography
-    out property <color> fg: #fafafa;
-    out property <color> fg-secondary: #e4e4e7;
-    out property <color> fg-muted: #a1a1aa;
-    out property <color> fg-subtle: #71717a;
+    out property <color> fg: #ececee;
+    out property <color> fg-secondary: #c9cacf;
+    out property <color> fg-muted: #a9aab0;
+    out property <color> fg-subtle: #8e8f96;
 
     // Brand / Primary (shadcn high-contrast + Holyrics Live Blue)
-    out property <color> primary: #fafafa;
-    out property <color> primary-hover: #e4e4e7;
-    out property <color> primary-fg: #09090b;
+    out property <color> primary: #b9c6ea;
+    out property <color> primary-hover: #c8d3f0;
+    out property <color> primary-fg: #0f1320;
 
-    out property <color> live-blue: #0284c7;
-    out property <color> live-blue-hover: #0369a1;
-    out property <color> live-blue-bright: #38bdf8;
-    out property <color> live-row-bg: #164e78;
-    out property <color> selected-row-bg: #1e293b;
+    out property <color> live-blue: #a4b3de;
+    out property <color> live-blue-hover: #b4c2e6;
+    out property <color> live-blue-bright: #b9c6ea;
+    out property <color> live-row-bg: #272b3a;
+    out property <color> selected-row-bg: #26272b;
 
     // Semantic Status
-    out property <color> emerald: #10b981;
-    out property <color> emerald-bg: #052e16;
-    out property <color> emerald-border: #065f46;
+    out property <color> emerald: #74cfae;
+    out property <color> emerald-bg: #17271f;
+    out property <color> emerald-border: #2f5a48;
 
-    out property <color> amber: #f59e0b;
-    out property <color> amber-bg: #451a03;
-    out property <color> amber-border: #92400e;
+    out property <color> amber: #e9b467;
+    out property <color> amber-bg: #2a2116;
+    out property <color> amber-border: #6b4e1e;
 
-    out property <color> destructive: #ef4444;
-    out property <color> destructive-bg: #450a0a;
-    out property <color> destructive-hover: #7f1d1d;
-    out property <color> destructive-border: #991b1b;
+    out property <color> destructive: #f07c88;
+    out property <color> destructive-bg: #2e1a1d;
+    out property <color> destructive-hover: #4a2528;
+    out property <color> destructive-border: #6b2e35;
 
     // Radii (shadcn/ui radius = 0.375rem / 6px)
     out property <length> radius-xs: 4px;
-    out property <length> radius-sm: 5px;
-    out property <length> radius-md: 6px;
-    out property <length> radius-lg: 8px;
+    out property <length> radius-sm: 6px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-lg: 12px;
 
     // Holyrics 66-Book Canonical Palette (Modernized saturation)
     public pure function bible-book-bg(cat: int, active: bool, hovered: bool) -> color {
-        if (active) { return #0284c7; }
-        if (cat == 0) { return hovered ? #57381c : #432a14; } // Pentateuch
-        if (cat == 1) { return hovered ? #cf7d1d : #b86b14; } // Historical
-        if (cat == 2) { return hovered ? #c42525 : #a81c1c; } // Poetic
-        if (cat == 3) { return hovered ? #863696 : #6e297c; } // Prophets
-        if (cat == 4) { return hovered ? #2560b8 : #1c4c96; } // Gospels
-        if (cat == 5) { return hovered ? #1298ba : #0d7f9c; } // Acts
-        if (cat == 6) { return hovered ? #16945b : #107a49; } // Epistles
-        return hovered ? #78b81d : #649c16;                   // Revelation
+        if (active) { return #2b3350; }
+        if (cat == 0) { return hovered ? #5a483b : #4a3a30; } // Pentateuco
+        if (cat == 1) { return hovered ? #6b5a36 : #5a4a2e; } // Históricos
+        if (cat == 2) { return hovered ? #6b3f3f : #5a3434; } // Poéticos
+        if (cat == 3) { return hovered ? #524870 : #443a5c; } // Profetas
+        if (cat == 4) { return hovered ? #3b4d6e : #2f3f5c; } // Evangelhos
+        if (cat == 5) { return hovered ? #3b6064 : #2f4f52; } // Atos
+        if (cat == 6) { return hovered ? #3b6450 : #2f5140; } // Epístolas
+        return hovered ? #5a6440 : #4a5230;                   // Apocalipse
     }
 
     public pure function bible-book-border(cat: int, active: bool) -> color {
-        if (active) { return #7dd3fc; }
-        if (cat == 0) { return #664222; }
-        if (cat == 1) { return #db8c32; }
-        if (cat == 2) { return #cf3a3a; }
-        if (cat == 3) { return #9342a3; }
-        if (cat == 4) { return #356ec4; }
-        if (cat == 5) { return #27a7c4; }
-        if (cat == 6) { return #24a369; }
-        return #88c92e;
+        if (active) { return #a4b3de; }
+        if (cat == 0) { return #5e4b3e; }
+        if (cat == 1) { return #6e5c36; }
+        if (cat == 2) { return #6e4444; }
+        if (cat == 3) { return #5a4d78; }
+        if (cat == 4) { return #3f5378; }
+        if (cat == 5) { return #3f6a6e; }
+        if (cat == 6) { return #3f6b55; }
+        return #5c6a42;
     }
 }

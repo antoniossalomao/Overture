@@ -1,5 +1,5 @@
 use chrono::Local;
-use cosmic_text::{Align, Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, SwashCache, Weight};
+use cosmic_text::{Align, Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, Style, SwashCache, Weight};
 use image::RgbaImage;
 use overture_core::{
     BackgroundSpec, CountdownState, DisplayMode, HorizontalAlign, OutputRole, OutputState,
@@ -213,6 +213,8 @@ struct TextBlockSpec<'a> {
     font_size_px: f32,
     line_height_px: f32,
     bold: bool,
+    italic: bool,
+    glow: overture_core::GlowSpec,
     color: RgbaColor,
     h_align: HorizontalAlign,
     v_align: VerticalAlign,
@@ -287,6 +289,8 @@ impl SlideCompositor {
                 font_size_px: font_px,
                 line_height_px: font_px * theme.line_height_scale,
                 bold: theme.bold,
+                italic: theme.italic,
+                glow: overture_core::GlowSpec { radius: theme.glow.radius * scale, ..theme.glow },
                 color: theme.text_color,
                 h_align: theme.h_align,
                 v_align: theme.v_align,
@@ -359,6 +363,8 @@ impl SlideCompositor {
                         font_size_px: (76.0 * scale).max(16.0),
                         line_height_px: (92.0 * scale).max(20.0),
                         bold: true,
+                        italic: false,
+                        glow: overture_core::GlowSpec::OFF,
                         color: RgbaColor::new(226, 232, 240, 220),
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Middle,
@@ -406,15 +412,18 @@ impl SlideCompositor {
         if state.display_mode != DisplayMode::ClearText
             && let Some(slide) = state.current_slide()
         {
+            let shown = if theme.uppercase { slide.text.to_uppercase() } else { slide.text.clone() };
             if !slide.text.trim().is_empty() {
                 self.draw_text_block(
                     &mut frame,
                     TextBlockSpec {
-                        text: &slide.text,
+                        text: &shown,
                         font_family: &theme.font_family,
                         font_size_px: font_px,
                         line_height_px: font_px * theme.line_height_scale,
                         bold: theme.bold,
+                        italic: theme.italic,
+                        glow: overture_core::GlowSpec { radius: theme.glow.radius * scale, ..theme.glow },
                         color: theme.text_color,
                         h_align: theme.h_align,
                         v_align: theme.v_align,
@@ -444,6 +453,8 @@ impl SlideCompositor {
                         font_size_px: footer_px,
                         line_height_px: footer_px * 1.25,
                         bold: true,
+                        italic: false,
+                        glow: overture_core::GlowSpec::OFF,
                         color: theme.footer_color,
                         h_align: theme.h_align,
                         v_align: VerticalAlign::Bottom,
@@ -479,6 +490,39 @@ impl SlideCompositor {
             } else {
                 self.draw_fullscreen_countdown(&mut frame, &state.countdown, theme, scale);
             }
+        }
+
+        // Relógio (HH:MM) no canto superior direito da saída principal
+        if theme.show_clock && !is_return_monitor {
+            let now = chrono::Local::now().format("%H:%M").to_string();
+            let px = (44.0 * scale).max(14.0);
+            let box_w = ((frame.width as f32) * 0.22).round().max(60.0) as u32;
+            let box_x = frame.width as i32 - box_w as i32 - (36.0 * scale) as i32;
+            self.draw_text_block(
+                &mut frame,
+                TextBlockSpec {
+                    text: &now,
+                    font_family: &theme.font_family,
+                    font_size_px: px,
+                    line_height_px: px * 1.2,
+                    bold: true,
+                    italic: false,
+                    glow: overture_core::GlowSpec::OFF,
+                    color: RgbaColor::new(255, 255, 255, 220),
+                    h_align: HorizontalAlign::Right,
+                    v_align: VerticalAlign::Top,
+                    shadow: ShadowSpec {
+                        enabled: true,
+                        color: RgbaColor::new(0, 0, 0, 200),
+                        offset_x: 2.0 * scale,
+                        offset_y: 2.0 * scale,
+                    },
+                    box_x,
+                    box_y: (28.0 * scale) as i32,
+                    box_w,
+                    box_h: (px * 1.4) as u32,
+                },
+            );
         }
 
         // Manual Scoreboard overlay
@@ -520,6 +564,8 @@ impl SlideCompositor {
                 font_size_px: header_font,
                 line_height_px: header_font * 1.2,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::new(148, 163, 184, 255),
                 h_align: HorizontalAlign::Left,
                 v_align: VerticalAlign::Middle,
@@ -560,6 +606,8 @@ impl SlideCompositor {
                 font_size_px: (32.0 * scale).max(9.0),
                 line_height_px: (38.0 * scale).max(11.0),
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::WHITE,
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Middle,
@@ -592,6 +640,8 @@ impl SlideCompositor {
                 font_size_px: header_font,
                 line_height_px: header_font * 1.2,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: timer_color,
                 h_align: HorizontalAlign::Right,
                 v_align: VerticalAlign::Middle,
@@ -618,10 +668,9 @@ impl SlideCompositor {
             RgbaColor::new(15, 23, 42, 255),
         );
 
-        let current_text = state
-            .current_slide()
-            .map(|s| s.text.as_str())
-            .unwrap_or("—");
+        let current_raw = state.current_slide().map(|s| s.text.as_str()).unwrap_or("—");
+        let current_owned = if state.return_theme.uppercase { current_raw.to_uppercase() } else { current_raw.to_string() };
+        let current_text = current_owned.as_str();
         let cur_font = (62.0 * scale).max(12.0);
         self.draw_text_block(
             &mut frame,
@@ -631,6 +680,8 @@ impl SlideCompositor {
                 font_size_px: cur_font,
                 line_height_px: cur_font * 1.28,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::WHITE,
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Middle,
@@ -681,6 +732,8 @@ impl SlideCompositor {
                 font_size_px: next_font,
                 line_height_px: next_font * 1.26,
                 bold: false,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::new(253, 224, 71, 255),
                 h_align: HorizontalAlign::Left,
                 v_align: VerticalAlign::Top,
@@ -711,6 +764,8 @@ impl SlideCompositor {
                 font_size_px: notes_font,
                 line_height_px: notes_font * 1.25,
                 bold: false,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::new(203, 213, 225, 255),
                 h_align: HorizontalAlign::Left,
                 v_align: VerticalAlign::Top,
@@ -812,6 +867,8 @@ impl SlideCompositor {
                     font_size_px: sub_px,
                     line_height_px: sub_px * 1.22,
                     bold: true,
+                    italic: false,
+                    glow: overture_core::GlowSpec::OFF,
                     color: theme.text_color,
                     h_align: HorizontalAlign::Center,
                     v_align: VerticalAlign::Bottom,
@@ -832,6 +889,8 @@ impl SlideCompositor {
                 font_size_px: clock_px,
                 line_height_px: clock_px * 1.12,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: theme.text_color,
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Middle,
@@ -856,6 +915,8 @@ impl SlideCompositor {
                     font_size_px: after_px,
                     line_height_px: after_px * 1.24,
                     bold: true,
+                    italic: false,
+                    glow: overture_core::GlowSpec::OFF,
                     color: theme.text_color,
                     h_align: HorizontalAlign::Center,
                     v_align: VerticalAlign::Top,
@@ -914,6 +975,8 @@ impl SlideCompositor {
                 font_size_px: font_px,
                 line_height_px: font_px * 1.18,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::new(251, 191, 36, 255),
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Middle,
@@ -967,6 +1030,8 @@ impl SlideCompositor {
                 font_size_px: font_px,
                 line_height_px: font_px * 1.25,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::WHITE,
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Middle,
@@ -1002,6 +1067,8 @@ impl SlideCompositor {
                 font_size_px: font_px,
                 line_height_px: font_px * 1.2,
                 bold: true,
+                italic: false,
+                glow: overture_core::GlowSpec::OFF,
                 color: RgbaColor::WHITE,
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Middle,
@@ -1034,11 +1101,10 @@ impl SlideCompositor {
         } else {
             Family::Name(spec.font_family)
         };
-        let attrs = Attrs::new().family(family).weight(if spec.bold {
-            Weight::BOLD
-        } else {
-            Weight::NORMAL
-        });
+        let attrs = Attrs::new()
+            .family(family)
+            .weight(if spec.bold { Weight::BOLD } else { Weight::NORMAL })
+            .style(if spec.italic { Style::Italic } else { Style::Normal });
         buffer.set_text(&mut self.font_system, spec.text, attrs, Shaping::Advanced);
 
         let align = match spec.h_align {
@@ -1065,6 +1131,33 @@ impl SlideCompositor {
                 spec.box_y + (spec.box_h as f32 - total_text_h).round() as i32
             }
         };
+
+        // Brilho: o texto é desenhado em anel de deslocamentos com alfa baixo, formando um halo.
+        if spec.glow.enabled && spec.glow.radius > 0.0 && spec.glow.color.a > 0 {
+            let r = spec.glow.radius;
+            let steps = 24u32;
+            let pass_alpha = (spec.glow.color.a as f32 / 5.0).round().clamp(1.0, 255.0) as u8;
+            let g_col = Color::rgba(spec.glow.color.r, spec.glow.color.g, spec.glow.color.b, pass_alpha);
+            for ring in [0.5f32, 1.0] {
+                for k in 0..steps {
+                    let ang = std::f32::consts::TAU * k as f32 / steps as f32;
+                    let gx = spec.box_x + (ang.cos() * r * ring).round() as i32;
+                    let gy = y_offset + (ang.sin() * r * ring).round() as i32;
+                    buffer.draw(&mut self.font_system, &mut self.swash_cache, g_col, |x, y, w, h, drawn| {
+                        let a = drawn.a();
+                        if a == 0 {
+                            return;
+                        }
+                        let px_col = RgbaColor::new(drawn.r(), drawn.g(), drawn.b(), a);
+                        if w == 1 && h == 1 {
+                            frame.blend_pixel(gx + x, gy + y, px_col);
+                        } else {
+                            frame.fill_rect(gx + x, gy + y, w, h, px_col);
+                        }
+                    });
+                }
+            }
+        }
 
         if spec.shadow.enabled && spec.shadow.color.a > 0 {
             let sx = spec.box_x + spec.shadow.offset_x.round() as i32;

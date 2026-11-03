@@ -232,7 +232,7 @@ impl Storage {
         }
 
         let dup_title_artist: Option<i64> = sqlx::query_scalar(
-            "SELECT id FROM songs WHERE lower(title) = lower(?) AND lower(artist) = lower(?) LIMIT 1",
+            "SELECT id FROM songs WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE LIMIT 1",
         )
         .bind(&song.title)
         .bind(&song.artist)
@@ -287,6 +287,111 @@ impl Storage {
             id: song_id,
             duplicate_title_artist: is_dup_marked,
         })
+    }
+
+    /// Importação em lote: uma transação, duplicatas exatas ignoradas e grupo automático por artista.
+    /// Pensada para bibliotecas grandes (dezenas de milhares de músicas).
+    pub async fn import_songs_bulk(
+        &self,
+        songs: &[Song],
+        group_by_artist: bool,
+    ) -> Result<BulkImportReport> {
+        let mut report = BulkImportReport::default();
+        let mut group_cache: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        let mut tx = self.pool.begin().await?;
+
+        for song in songs {
+            let slide_refs: Vec<&str> = song.slides.iter().map(|s| s.text.as_str()).collect();
+            let norm_hash = canonical_lyrics_key(&slide_refs);
+            if !norm_hash.is_empty() {
+                let existing: Option<i64> =
+                    sqlx::query_scalar("SELECT id FROM songs WHERE normalized_hash = ? LIMIT 1")
+                        .bind(&norm_hash)
+                        .fetch_optional(&mut *tx)
+                        .await?;
+                if existing.is_some() {
+                    report.skipped_duplicates += 1;
+                    continue;
+                }
+            }
+
+            let dup_title_artist: Option<i64> = sqlx::query_scalar(
+                "SELECT id FROM songs WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE LIMIT 1",
+            )
+            .bind(&song.title)
+            .bind(&song.artist)
+            .fetch_optional(&mut *tx)
+            .await?;
+            let is_dup_marked = song.duplicate_marked || dup_title_artist.is_some();
+            if is_dup_marked {
+                report.marked_title_artist += 1;
+            }
+
+            let group_id = match song.group_id {
+                Some(g) => Some(g),
+                None if group_by_artist && !song.artist.trim().is_empty() => {
+                    let key = song.artist.trim().to_string();
+                    if let Some(id) = group_cache.get(&key) {
+                        Some(*id)
+                    } else {
+                        sqlx::query("INSERT OR IGNORE INTO groups (name) VALUES (?)")
+                            .bind(&key)
+                            .execute(&mut *tx)
+                            .await?;
+                        let id: i64 = sqlx::query_scalar("SELECT id FROM groups WHERE name = ?")
+                            .bind(&key)
+                            .fetch_one(&mut *tx)
+                            .await?;
+                        group_cache.insert(key, id);
+                        Some(id)
+                    }
+                }
+                None => None,
+            };
+
+            let search_blob = build_song_search_blob(song);
+            let created_at = if song.created_at.is_empty() {
+                chrono::Utc::now().to_rfc3339()
+            } else {
+                song.created_at.clone()
+            };
+            let res = sqlx::query(
+                r#"INSERT INTO songs
+                   (title, artist, author, group_id, notes, source, archived, duplicate_marked, normalized_hash, search_blob, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            )
+            .bind(&song.title)
+            .bind(&song.artist)
+            .bind(&song.author)
+            .bind(group_id)
+            .bind(&song.notes)
+            .bind(&song.source)
+            .bind(song.archived as i32)
+            .bind(is_dup_marked as i32)
+            .bind(&norm_hash)
+            .bind(&search_blob)
+            .bind(&created_at)
+            .execute(&mut *tx)
+            .await?;
+            let song_id = res.last_insert_rowid();
+            for (idx, slide) in song.slides.iter().enumerate() {
+                sqlx::query(
+                    r#"INSERT INTO song_slides (song_id, "order", text, forced_break, duration_secs)
+                       VALUES (?, ?, ?, ?, ?)"#,
+                )
+                .bind(song_id)
+                .bind(idx as i32)
+                .bind(&slide.text)
+                .bind(slide.forced_break as i32)
+                .bind(slide.duration_secs.map(|d| d as i64))
+                .execute(&mut *tx)
+                .await?;
+            }
+            report.inserted += 1;
+        }
+        report.groups_total = group_cache.len();
+        tx.commit().await?;
+        Ok(report)
     }
 
     pub async fn update_song(&self, song: &Song) -> Result<()> {
@@ -401,7 +506,8 @@ impl Storage {
             for _ in &tokens {
                 sql.push_str(" AND search_blob LIKE ?");
             }
-            sql.push_str(" ORDER BY title COLLATE NOCASE ASC LIMIT ?");
+            // Relevância: título que contém o primeiro termo vem antes; depois, por título.
+            sql.push_str(" ORDER BY CASE WHEN lower(title) LIKE ? THEN 0 ELSE 1 END, title COLLATE NOCASE ASC LIMIT ?");
 
             let mut q = sqlx::query(&sql)
                 .bind(include_archived as i32)
@@ -410,6 +516,7 @@ impl Storage {
             for tok in &tokens {
                 q = q.bind(format!("%{tok}%"));
             }
+            q = q.bind(format!("%{}%", tokens[0]));
             q = q.bind(limit);
             q.fetch_all(&self.pool).await?
         };
@@ -925,6 +1032,13 @@ impl Storage {
         query: &str,
         limit: i64,
     ) -> Result<Vec<BibleVerse>> {
+        // Filtros: @AT, @NT, @livro:N (1..66), @cap:N. O restante é a busca por palavras.
+        let (text_part, filters) = split_bible_filters(query.trim());
+        if !filters.is_empty() {
+            return self
+                .search_bible_filtered(version_id, &text_part, &filters, limit)
+                .await;
+        }
         let trimmed = query.trim();
         if trimmed.is_empty() {
             let rows = sqlx::query(
@@ -985,6 +1099,48 @@ impl Storage {
         sql.push_str(" ORDER BY book_order ASC, chapter ASC, verse ASC LIMIT ?");
 
         let mut q = sqlx::query(&sql).bind(version_id);
+        for tok in &tokens {
+            q = q.bind(format!("%{tok}%"));
+        }
+        q = q.bind(limit);
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(row_to_bible_verse).collect())
+    }
+
+    /// Busca com filtros (`@AT`, `@NT`, `@livro:N`, `@cap:N`) e palavras opcionais.
+    async fn search_bible_filtered(
+        &self,
+        version_id: i64,
+        text_part: &str,
+        filters: &[BibleFilter],
+        limit: i64,
+    ) -> Result<Vec<BibleVerse>> {
+        let folded = fold_search_text(text_part);
+        let tokens: Vec<&str> = folded.split_whitespace().collect();
+        let mut sql = String::from(
+            r#"SELECT version_id, book, book_order, chapter, verse, text
+               FROM bible_verses WHERE version_id = ?"#,
+        );
+        for f in filters {
+            match f {
+                BibleFilter::Old => sql.push_str(" AND book_order <= 39"),
+                BibleFilter::New => sql.push_str(" AND book_order >= 40"),
+                BibleFilter::Book(_) => sql.push_str(" AND book_order = ?"),
+                BibleFilter::Chapter(_) => sql.push_str(" AND chapter = ?"),
+            }
+        }
+        for _ in &tokens {
+            sql.push_str(" AND search_blob LIKE ?");
+        }
+        sql.push_str(" ORDER BY book_order ASC, chapter ASC, verse ASC LIMIT ?");
+
+        let mut q = sqlx::query(&sql).bind(version_id);
+        for f in filters {
+            match f {
+                BibleFilter::Book(n) | BibleFilter::Chapter(n) => q = q.bind(*n),
+                _ => {}
+            }
+        }
         for tok in &tokens {
             q = q.bind(format!("%{tok}%"));
         }
@@ -1261,6 +1417,41 @@ impl Storage {
             .collect())
     }
 
+    /// Execuções por grupo de músicas (músicas sem grupo aparecem como "Sem grupo").
+    pub async fn report_plays_by_group(
+        &self,
+        from_iso: Option<&str>,
+        to_iso: Option<&str>,
+        weekday: Option<u32>,
+    ) -> Result<Vec<(String, i64)>> {
+        let rows = sqlx::query(
+            r#"SELECT COALESCE(g.name, 'Sem grupo') AS group_name, COUNT(e.id) AS play_count
+               FROM execution_log e
+               JOIN songs s ON s.id = COALESCE(
+                   e.song_id,
+                   (SELECT si.ref_id FROM service_items si WHERE si.id = e.service_item_id AND si.kind = 'song')
+               )
+               LEFT JOIN groups g ON g.id = s.group_id
+               WHERE (? IS NULL OR e.executed_at >= ?)
+                 AND (? IS NULL OR e.executed_at <= ?)
+                 AND (? IS NULL OR CAST(strftime('%w', e.executed_at) AS INTEGER) = ?)
+               GROUP BY group_name
+               ORDER BY play_count DESC, group_name COLLATE NOCASE ASC"#,
+        )
+        .bind(from_iso)
+        .bind(from_iso)
+        .bind(to_iso)
+        .bind(to_iso)
+        .bind(weekday.map(|w| w as i64))
+        .bind(weekday.map(|w| w as i64))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.get::<String, _>("group_name"), r.get::<i64, _>("play_count")))
+            .collect())
+    }
+
     // ==================== SETTINGS ====================
 
     pub async fn load_settings(&self) -> Result<AppSettings> {
@@ -1523,4 +1714,77 @@ mod tests {
 
         Ok(())
     }
+}
+
+/// Filtro de busca bíblica (`@AT`, `@NT`, `@livro:N`, `@cap:N`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BibleFilter {
+    Old,
+    New,
+    Book(i64),
+    Chapter(i64),
+}
+
+/// Separa os filtros `@...` do texto da busca. Filtros inválidos são ignorados como texto.
+pub fn split_bible_filters(query: &str) -> (String, Vec<BibleFilter>) {
+    let mut filters = Vec::new();
+    let mut words = Vec::new();
+    for tok in query.split_whitespace() {
+        let Some(rest) = tok.strip_prefix('@') else {
+            words.push(tok);
+            continue;
+        };
+        let lower = rest.to_ascii_lowercase();
+        let parsed = if lower == "at" {
+            Some(BibleFilter::Old)
+        } else if lower == "nt" {
+            Some(BibleFilter::New)
+        } else if let Some(n) = lower.strip_prefix("livro:").and_then(|v| v.parse::<i64>().ok()) {
+            (1..=66).contains(&n).then_some(BibleFilter::Book(n))
+        } else if let Some(n) = lower.strip_prefix("cap:").and_then(|v| v.parse::<i64>().ok()) {
+            (n >= 1).then_some(BibleFilter::Chapter(n))
+        } else {
+            None
+        };
+        match parsed {
+            Some(f) => filters.push(f),
+            None => words.push(tok),
+        }
+    }
+    (words.join(" "), filters)
+}
+
+#[cfg(test)]
+mod bible_filter_tests {
+    use super::*;
+
+    #[test]
+    fn parses_filters_and_keeps_text() {
+        let (text, f) = split_bible_filters("amor @NT @cap:3");
+        assert_eq!(text, "amor");
+        assert_eq!(f, vec![BibleFilter::New, BibleFilter::Chapter(3)]);
+        let (text, f) = split_bible_filters("@livro:43 luz");
+        assert_eq!(text, "luz");
+        assert_eq!(f, vec![BibleFilter::Book(43)]);
+    }
+
+    #[test]
+    fn ignores_invalid_filters_as_text() {
+        let (text, f) = split_bible_filters("@livro:99 @xyz");
+        assert_eq!(text, "@livro:99 @xyz");
+        assert!(f.is_empty());
+    }
+}
+
+/// Resultado de uma importação em lote.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct BulkImportReport {
+    /// Músicas gravadas.
+    pub inserted: usize,
+    /// Duplicatas exatas (mesmas letras) ignoradas.
+    pub skipped_duplicates: usize,
+    /// Músicas gravadas com mesmo título e artista de outra (marcadas para revisão).
+    pub marked_title_artist: usize,
+    /// Grupos (artistas) usados pela importação.
+    pub groups_total: usize,
 }

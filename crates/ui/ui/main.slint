@@ -88,17 +88,67 @@ component TopMenuTrigger inherits Rectangle {
     in property <string> label;
     callback clicked();
 
-    height: 22px;
-    width: txt.preferred-width + 10px;
-    border-radius: 4px;
-    background: ta.has-hover ? ShadTheme.accent : transparent;
+    // Ocupa a altura inteira da barra (26px) para todos os itens ficarem na mesma linha de base,
+    // independente do container onde são colocados.
+    height: 26px;
+    width: txt.preferred-width + 16px;
+    background: transparent;
+
+    hover-bg := Rectangle {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        border-radius: 4px;
+        background: ta.has-hover ? ShadTheme.accent : transparent;
+    }
 
     txt := Text {
+        x: 8px;
+        width: parent.width - 16px;
+        height: parent.height;
         text: root.label;
-        font-size: 11px;
+        font-size: 12px;
         color: ta.has-hover ? ShadTheme.fg : ShadTheme.fg-secondary;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component LibTab inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> active: false;
+    callback clicked();
+
+    border-radius: 4px;
+    background: root.active ? #26304a : (ta.has-hover ? ShadTheme.accent : transparent);
+    border-width: root.active ? 1px : 0px;
+    border-color: ShadTheme.live-blue-bright;
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 4px;
+        padding-left: 4px;
+        padding-right: 4px;
+        VerticalLayout {
+            alignment: center;
+            LucideIcon { name: root.icon; icon-size: 12px; tint: root.active ? #b9c6ea : ShadTheme.fg-muted; }
+        }
+        Text {
+            text: root.label;
+            font-size: 11px;
+            font-weight: root.active ? 600 : 500;
+            color: root.active ? #ffffff : ShadTheme.fg-muted;
+            vertical-alignment: center;
+        }
     }
 
     ta := TouchArea {
@@ -110,6 +160,7 @@ component TopMenuTrigger inherits Rectangle {
 component MenuActionRow inherits Rectangle {
     in property <string> label;
     in property <string> shortcut: "";
+    in property <string> icon: "";
     callback triggered();
 
     height: 26px;
@@ -119,17 +170,21 @@ component MenuActionRow inherits Rectangle {
     HorizontalLayout {
         padding-left: 10px;
         padding-right: 10px;
-        spacing: 12px;
+        spacing: 8px;
+        if root.icon != "" : VerticalLayout {
+            alignment: center;
+            LucideIcon { name: root.icon; icon-size: 13px; tint: ShadTheme.fg-muted; }
+        }
         Text {
             horizontal-stretch: 1;
             text: root.label;
-            font-size: 11.5px;
+            font-size: 12px;
             color: ShadTheme.fg;
             vertical-alignment: center;
         }
         if root.shortcut != "" : Text {
             text: root.shortcut;
-            font-size: 10.5px;
+            font-size: 11px;
             color: ShadTheme.fg-subtle;
             vertical-alignment: center;
         }
@@ -148,6 +203,7 @@ export component MainWindow inherits Window {
     preferred-width: 1200px;
     preferred-height: 720px;
     background: ShadTheme.bg;
+    default-font-family: "Geist";
     icon: @image-url("../../../assets/overture-512.png");
 
     // ==================== STATE PROPERTIES ====================
@@ -175,6 +231,7 @@ export component MainWindow inherits Window {
     in-out property <bool> is-logo-screen: false;
     in-out property <bool> is-clear-text: false;
     in-out property <bool> auto-play-enabled: false;
+    in-out property <bool> auto-play-repeat: true;
 
     // Column 1: Library
     in-out property <int> left-lib-tab: 0; // 0 Letras, 1 Texto, 2 Áudio, 3 Vídeo, 4 Imagem
@@ -213,6 +270,8 @@ export component MainWindow inherits Window {
     in-out property <[UiPlaylistRow]> playlist-song-rows: [];
     in-out property <[UiPlaylistRow]> playlist-media-rows: [];
     in-out property <int> active-playlist-row: -1;
+    property <length> drag-press-y: 0px;
+    property <length> drag-cur-y: 0px;
 
     // Column 5: Far-Right Vertical Theme Thumbnail Strip
     in-out property <bool> show-theme-strip: true;
@@ -224,6 +283,8 @@ export component MainWindow inherits Window {
     in-out property <string> bible-license-notice: "Tradução Brasileira (1917) — Domínio Público";
     in-out property <[string]> bible-version-abbrs: ["TB1917", "WEB"];
     in-out property <int> bible-version-idx: 0;
+    in-out property <bool> bible-compare-on: false;
+    in-out property <string> bible-compare-text: "";
     in-out property <[UiBibleBookGridRow]> bible-book-grid-rows: [];
     in-out property <[UiNumberGridRow]> bible-chapter-grid-rows: [];
     in-out property <[UiNumberGridRow]> bible-verse-grid-rows: [];
@@ -261,6 +322,10 @@ export component MainWindow inherits Window {
     in-out property <string> theme-bg-secondary: "#1C2541";
     in-out property <string> theme-bg-media: "motion://aurora";
     in-out property <bool> theme-shadow-enabled: true;
+    in-out property <bool> theme-italic: false;
+    in-out property <bool> theme-glow: false;
+    in-out property <bool> theme-clock: false;
+    in-out property <bool> theme-uppercase: false;
     in-out property <bool> theme-is-return: false;
     in-out property <int> theme-align-index: 1;
     in-out property <image> theme-live-preview;
@@ -286,6 +351,7 @@ export component MainWindow inherits Window {
     // Schedule & Reports
     in-out property <[UiScheduleRow]> schedule-rows: [];
     in-out property <[UiReportRow]> report-rows: [];
+    in-out property <bool> report-by-group: false;
     in-out property <int> report-weekday-index: 0;
 
     // Settings & Remote
@@ -299,9 +365,9 @@ export component MainWindow inherits Window {
     in-out property <string> shortcut-logo: "L";
 
     // Resizable column widths (tuned to Holyrics proportions so 1024px+ fits all 5 columns cleanly)
-    property <length> col1-width: 182px;
-    property <length> col2-width: 268px;
-    property <length> col4-width: 162px;
+    property <length> col1-width: 250px;
+    property <length> col2-width: 300px;
+    property <length> col4-width: 200px;
 
     // ==================== CALLBACKS ====================
     callback key-shortcut(string);
@@ -315,11 +381,13 @@ export component MainWindow inherits Window {
     callback toggle-clear-text();
     callback clear-output();
     callback toggle-auto-play(bool);
+    callback toggle-auto-play-repeat(bool);
 
     // Library & Songs
     callback search-songs(string);
     callback search-songs-accepted(string);
     callback toggle-show-archived(bool);
+    callback library-step(int);      // Alt+↑/↓: move a seleção na biblioteca
     callback song-select(int);       // Loads song into Col 2 (and records in session history)
     callback song-project-now(int);  // Loads & projects slide 0 immediately
     callback song-add-to-service(int);
@@ -342,6 +410,8 @@ export component MainWindow inherits Window {
     callback dialog-import-pptx-or-xml();
     callback dialog-import-bible();
     callback dialog-export-txt();
+    callback dialog-export-slides();
+    callback create-recurring-services();
     callback dialog-export-json();
     callback dialog-create-backup();
     callback dialog-restore-backup();
@@ -378,6 +448,7 @@ export component MainWindow inherits Window {
 
     // Bible Studio
     callback bible-select-version(int);
+    callback bible-toggle-compare();
     callback bible-select-book(int);
     callback bible-select-chapter(int);
     callback bible-select-verse-project(int);
@@ -430,6 +501,20 @@ export component MainWindow inherits Window {
                     root.prev-slide();
                     return accept;
                 }
+                if (root.workspace-mode == 0 && root.left-lib-tab == 0) {
+                    if (event.text == Key.Return && root.selected-song-id > 0) {
+                        root.song-project-now(root.selected-song-id);
+                        return accept;
+                    }
+                    if (event.modifiers.alt && event.text == Key.UpArrow) {
+                        root.library-step(-1);
+                        return accept;
+                    }
+                    if (event.modifiers.alt && event.text == Key.DownArrow) {
+                        root.library-step(1);
+                        return accept;
+                    }
+                }
                 if (root.workspace-mode == 1) {
                     if (event.text == Key.Return) {
                         root.bible-search-accepted(root.bible-search-query);
@@ -468,7 +553,7 @@ export component MainWindow inherits Window {
 
                     // Left Menus
                     HorizontalLayout {
-                        spacing: 1px;
+                        spacing: 2px;
                         alignment: start;
 
                         // Brand Mark
@@ -502,17 +587,18 @@ export component MainWindow inherits Window {
                                     background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
                                     arq-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
-                                        MenuActionRow { label: "Importar Pasta de Letras (.txt)..."; triggered => { root.dialog-import-txt-folder(); } }
-                                        MenuActionRow { label: "Importar PPTX / OpenSong / OpenLP..."; triggered => { root.dialog-import-pptx-or-xml(); } }
-                                        MenuActionRow { label: "Importar Bíblia (Zefania / JSON)..."; triggered => { root.dialog-import-bible(); } }
+                                        MenuActionRow { label: "Importar Pasta de Letras (.txt)..."; icon: "folder"; triggered => { root.dialog-import-txt-folder(); } }
+                                        MenuActionRow { label: "Importar PPTX / OpenSong / OpenLP..."; icon: "folder"; triggered => { root.dialog-import-pptx-or-xml(); } }
+                                        MenuActionRow { label: "Importar Bíblia (Zefania / JSON)..."; icon: "book"; triggered => { root.dialog-import-bible(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
-                                        MenuActionRow { label: "Exportar Músicas em TXT..."; triggered => { root.dialog-export-txt(); } }
-                                        MenuActionRow { label: "Exportar Pacote JSON..."; triggered => { root.dialog-export-json(); } }
+                                        MenuActionRow { label: "Exportar Músicas em TXT..."; icon: "share"; triggered => { root.dialog-export-txt(); } }
+                                        MenuActionRow { label: "Exportar Slides do Item Atual (PNG)..."; icon: "monitor"; triggered => { root.dialog-export-slides(); } }
+                                        MenuActionRow { label: "Exportar Pacote JSON..."; icon: "share"; triggered => { root.dialog-export-json(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
-                                        MenuActionRow { label: "Criar Backup Completo (.zip)..."; triggered => { root.dialog-create-backup(); } }
-                                        MenuActionRow { label: "Restaurar Backup (.zip)..."; triggered => { root.dialog-restore-backup(); } }
+                                        MenuActionRow { label: "Criar Backup Completo (.zip)..."; icon: "folder"; triggered => { root.dialog-create-backup(); } }
+                                        MenuActionRow { label: "Restaurar Backup (.zip)..."; icon: "history"; triggered => { root.dialog-restore-backup(); } }
                                         Rectangle { height: 1px; background: ShadTheme.border; }
-                                        MenuActionRow { label: "Configurações..."; triggered => { root.active-modal = 7; } }
+                                        MenuActionRow { label: "Configurações..."; icon: "settings"; triggered => { root.active-modal = 7; } }
                                     }
                                 }
                             }
@@ -530,10 +616,11 @@ export component MainWindow inherits Window {
                                     background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
                                     novo-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
-                                        MenuActionRow { label: "Nova Música..."; triggered => { root.editor-new-song(); root.active-modal = 2; } }
-                                        MenuActionRow { label: "Novo Culto..."; triggered => { root.create-new-service(); } }
-                                        MenuActionRow { label: "Adicionar Mídia (Vídeo/Áudio/Img)..."; triggered => { root.pick-and-add-media(); } }
-                                        MenuActionRow { label: "Nova Contagem Regressiva..."; triggered => { root.preview-studio-countdown("10", "00", "", "Para iniciar o culto", 0, true, false); root.active-modal = 1; } }
+                                        MenuActionRow { label: "Nova Música..."; icon: "music"; triggered => { root.editor-new-song(); root.active-modal = 2; } }
+                                        MenuActionRow { label: "Novo Culto..."; icon: "list"; triggered => { root.create-new-service(); } }
+                                        MenuActionRow { label: "Criar próximos 8 cultos recorrentes"; icon: "clock"; triggered => { root.create-recurring-services(); } }
+                                        MenuActionRow { label: "Adicionar Mídia (Vídeo/Áudio/Img)..."; icon: "plus"; triggered => { root.pick-and-add-media(); } }
+                                        MenuActionRow { label: "Nova Contagem Regressiva..."; icon: "clock"; triggered => { root.preview-studio-countdown("10", "00", "", "Para iniciar o culto", 0, true, false); root.active-modal = 1; } }
                                     }
                                 }
                             }
@@ -756,7 +843,7 @@ export component MainWindow inherits Window {
                         alignment: center;
                         Text {
                             text: root.active-header-title + (root.active-header-subtitle != "" ? "  (" + root.active-header-subtitle + ")" : "");
-                            font-size: 13.5px;
+                            font-size: 14px;
                             font-weight: 600;
                             color: ShadTheme.fg;
                             vertical-alignment: center;
@@ -804,6 +891,9 @@ export component MainWindow inherits Window {
                 license-notice: root.bible-license-notice;
                 version-abbrs: root.bible-version-abbrs;
                 active-version-idx: root.bible-version-idx;
+                compare-on: root.bible-compare-on;
+                compare-text: root.bible-compare-text;
+                toggle-compare => { root.bible-toggle-compare(); }
                 book-grid-rows: root.bible-book-grid-rows;
                 chapter-grid-rows: root.bible-chapter-grid-rows;
                 verse-grid-rows: root.bible-verse-grid-rows;
@@ -854,10 +944,14 @@ export component MainWindow inherits Window {
                             HorizontalLayout {
                                 padding: 3px;
                                 spacing: 3px;
-                                ShadTabStrip {
+                                HorizontalLayout {
                                     horizontal-stretch: 1;
-                                    tabs: ["Letras", "Texto", "Áudio", "Vídeo", "Img"];
-                                    active-index <=> root.left-lib-tab;
+                                    spacing: 2px;
+                                    LibTab { horizontal-stretch: 1; label: "Letras"; icon: "music"; active: root.left-lib-tab == 0; clicked => { root.left-lib-tab = 0; } }
+                                    LibTab { horizontal-stretch: 1; label: "Texto"; icon: "edit"; active: root.left-lib-tab == 1; clicked => { root.left-lib-tab = 1; } }
+                                    LibTab { horizontal-stretch: 1; label: "Áudio"; icon: "monitor"; active: root.left-lib-tab == 2; clicked => { root.left-lib-tab = 2; } }
+                                    LibTab { horizontal-stretch: 1; label: "Vídeo"; icon: "play"; active: root.left-lib-tab == 3; clicked => { root.left-lib-tab = 3; } }
+                                    LibTab { horizontal-stretch: 1; label: "Img"; icon: "grid"; active: root.left-lib-tab == 4; clicked => { root.left-lib-tab = 4; } }
                                 }
                                 ShadIconButton {
                                     icon: "plus";
@@ -1094,7 +1188,7 @@ export component MainWindow inherits Window {
                                 alignment: space-between;
                                 Text {
                                     text: root.songs-list.length + " itens";
-                                    font-size: 10.5px;
+                                    font-size: 11px;
                                     color: ShadTheme.fg-subtle;
                                     vertical-alignment: center;
                                 }
@@ -1157,6 +1251,15 @@ export component MainWindow inherits Window {
                                         root.toggle-auto-play(root.auto-play-enabled);
                                     }
                                 }
+                                ShadButton {
+                                    size: "xs";
+                                    label: root.auto-play-repeat ? "Repetir" : "Parar no fim";
+                                    variant: "secondary";
+                                    clicked => {
+                                        root.auto-play-repeat = !root.auto-play-repeat;
+                                        root.toggle-auto-play-repeat(root.auto-play-repeat);
+                                    }
+                                }
                                 Rectangle { width: 1px; height: 14px; y: 10px; background: ShadTheme.border; }
                                 ShadIconButton {
                                     icon: "palette";
@@ -1216,7 +1319,7 @@ export component MainWindow inherits Window {
                                 Text {
                                     horizontal-stretch: 1;
                                     text: "Histórico (" + root.song-history-rows.length + ")";
-                                    font-size: 10.5px;
+                                    font-size: 11px;
                                     font-weight: 500;
                                     color: ShadTheme.fg-muted;
                                     horizontal-alignment: center;
@@ -1354,7 +1457,7 @@ export component MainWindow inherits Window {
                                 Text {
                                     horizontal-stretch: 1;
                                     text: "wgpu DX12";
-                                    font-size: 10.5px;
+                                    font-size: 11px;
                                     color: ShadTheme.fg-muted;
                                     vertical-alignment: center;
                                     overflow: elide;
@@ -1621,7 +1724,21 @@ export component MainWindow inherits Window {
                                         width: max(24px, parent.width - 54px);
                                         height: 100%;
                                         mouse-cursor: pointer;
-                                        clicked => { root.activate-playlist-item(pl.row-idx); }
+                                        // Clique (pouca distância) projeta; arrastar para cima/baixo reordena.
+                                        pointer-event(ev) => {
+                                            if (ev.kind == PointerEventKind.down) {
+                                                root.drag-press-y = self.mouse-y;
+                                                root.drag-cur-y = self.mouse-y;
+                                            }
+                                        }
+                                        moved => { root.drag-cur-y = self.mouse-y; }
+                                        clicked => {
+                                            if (abs(root.drag-cur-y - root.drag-press-y) < 6px) {
+                                                root.activate-playlist-item(pl.row-idx);
+                                            } else {
+                                                root.move-playlist-item(pl.row-idx, round((root.drag-cur-y - root.drag-press-y) / 44px));
+                                            }
+                                        }
                                     }
 
                                     HorizontalLayout {
@@ -1645,7 +1762,7 @@ export component MainWindow inherits Window {
                                             }
                                             Text {
                                                 text: pl.subtitle != "" ? pl.subtitle : pl.kind-badge;
-                                                font-size: 9.5px;
+                                                font-size: 11px;
                                                 color: ShadTheme.fg-muted;
                                                 horizontal-alignment: center;
                                                 overflow: elide;
@@ -1724,7 +1841,7 @@ export component MainWindow inherits Window {
                                         Text {
                                             x: 2px; width: parent.width - 4px; height: 100%;
                                             text: th.name;
-                                            font-size: 8.5px;
+                                            font-size: 11px;
                                             color: #ffffff;
                                             horizontal-alignment: center;
                                             vertical-alignment: center;
@@ -1786,7 +1903,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         text: "Overture v0.1.1 • Rust Puro (Skia + DirectX 12)";
-                        font-size: 10px;
+                        font-size: 11px;
                         color: ShadTheme.fg-subtle;
                         vertical-alignment: center;
                     }
@@ -1794,8 +1911,8 @@ export component MainWindow inherits Window {
                     Text {
                         horizontal-stretch: 1;
                         text: root.status-banner;
-                        font-size: 10.5px;
-                        color: #7dd3fc;
+                        font-size: 11px;
+                        color: #b9c6ea;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                         overflow: elide;
@@ -1803,7 +1920,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         text: "Saída GPU: " + root.output-latency-text;
-                        font-size: 10px;
+                        font-size: 11px;
                         color: ShadTheme.fg-subtle;
                         vertical-alignment: center;
                     }
@@ -1847,6 +1964,10 @@ export component MainWindow inherits Window {
             edit-bg-secondary <=> root.theme-bg-secondary;
             edit-bg-media <=> root.theme-bg-media;
             edit-shadow <=> root.theme-shadow-enabled;
+            edit-italic <=> root.theme-italic;
+            edit-glow <=> root.theme-glow;
+            edit-clock <=> root.theme-clock;
+            edit-uppercase <=> root.theme-uppercase;
             edit-is-return <=> root.theme-is-return;
             edit-align <=> root.theme-align-index;
             theme-preview-image: root.theme-live-preview;
@@ -1889,6 +2010,7 @@ export component MainWindow inherits Window {
         if root.active-modal == 6 : ScheduleReportsModal {
             schedule-rows: root.schedule-rows;
             report-rows: root.report-rows;
+            report-by-group <=> root.report-by-group;
             weekday-idx <=> root.report-weekday-index;
             close => { root.active-modal = 0; }
             add-schedule(m, r) => { root.add-team-schedule(m, r); }
