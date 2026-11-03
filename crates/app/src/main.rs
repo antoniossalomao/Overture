@@ -3015,6 +3015,8 @@ fn populate_theme_editor_fields(ui: &MainWindow, t: &Theme) {
     ui.set_theme_font_size(format!("{}", t.config.font_size as u32).into());
     ui.set_theme_text_color(t.config.text_color.to_hex().into());
     ui.set_theme_shadow_enabled(t.config.shadow.enabled);
+    ui.set_theme_italic(t.config.italic);
+    ui.set_theme_glow(t.config.glow.enabled);
     ui.set_theme_is_return(t.is_return_theme);
     ui.set_theme_align_index(match t.config.h_align {
         HorizontalAlign::Left => 0,
@@ -3055,6 +3057,14 @@ fn read_theme_config_from_ui(ui: &MainWindow) -> ThemeConfig {
         cfg.text_color = col;
     }
     cfg.shadow.enabled = ui.get_theme_shadow_enabled();
+    cfg.italic = ui.get_theme_italic();
+    if ui.get_theme_glow() {
+        cfg.glow = overture_core::GlowSpec {
+            enabled: true,
+            color: RgbaColor::new(255, 255, 255, 170),
+            radius: 6.0,
+        };
+    }
     cfg.h_align = match ui.get_theme_align_index() {
         0 => HorizontalAlign::Left,
         2 => HorizontalAlign::Right,

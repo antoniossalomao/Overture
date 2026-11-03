@@ -123,6 +123,28 @@ impl Default for ShadowSpec {
     }
 }
 
+/// Brilho (glow) ao redor do texto: halo de cor com raio em pixels de referência 1080p.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct GlowSpec {
+    pub enabled: bool,
+    pub color: RgbaColor,
+    pub radius: f32,
+}
+
+impl GlowSpec {
+    pub const OFF: Self = Self {
+        enabled: false,
+        color: RgbaColor::BLACK,
+        radius: 0.0,
+    };
+}
+
+impl Default for GlowSpec {
+    fn default() -> Self {
+        Self::OFF
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TransitionKind {
@@ -134,6 +156,7 @@ pub enum TransitionKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ThemeConfig {
     pub font_family: String,
     pub font_size: f32,
@@ -147,6 +170,10 @@ pub struct ThemeConfig {
     pub shadow: ShadowSpec,
     pub background: BackgroundSpec,
     pub transition: TransitionKind,
+    /// Itálico do texto.
+    pub italic: bool,
+    /// Brilho ao redor do texto.
+    pub glow: GlowSpec,
 }
 
 impl Default for ThemeConfig {
@@ -164,6 +191,8 @@ impl Default for ThemeConfig {
             shadow: ShadowSpec::default(),
             background: BackgroundSpec::default(),
             transition: TransitionKind::Fade { duration_ms: 180 },
+            italic: false,
+            glow: GlowSpec::OFF,
         }
     }
 }
@@ -186,6 +215,8 @@ impl ThemeConfig {
                 bottom: RgbaColor::new(2, 6, 23, 255),
             },
             transition: TransitionKind::Fade { duration_ms: 180 },
+            italic: false,
+            glow: GlowSpec::OFF,
         }
     }
 
@@ -210,6 +241,8 @@ impl ThemeConfig {
                 color: RgbaColor::BLACK,
             },
             transition: TransitionKind::None,
+            italic: false,
+            glow: GlowSpec::OFF,
         }
     }
 }

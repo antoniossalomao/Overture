@@ -433,6 +433,8 @@ export component ThemeStudioModal inherits ModalShell {
     in-out property <string> edit-bg-secondary: "#1C2541";
     in-out property <string> edit-bg-media: "motion://aurora";
     in-out property <bool> edit-shadow: true;
+    in-out property <bool> edit-italic: false;
+    in-out property <bool> edit-glow: false;
     in-out property <bool> edit-is-return: false;
     in-out property <int> edit-align: 1; // 0 Left, 1 Center, 2 Right
     in property <image> theme-preview-image;
@@ -606,6 +608,8 @@ export component ThemeStudioModal inherits ModalShell {
             HorizontalLayout {
                 spacing: 16px;
                 ShadSwitch { label: "Sombra suave"; checked <=> root.edit-shadow; toggled => { root.refresh-preview(); } }
+                ShadSwitch { label: "Itálico"; checked <=> root.edit-italic; toggled => { root.refresh-preview(); } }
+                ShadSwitch { label: "Brilho"; checked <=> root.edit-glow; toggled => { root.refresh-preview(); } }
                 ShadSwitch { label: "Tema de Retorno"; checked <=> root.edit-is-return; toggled => { root.refresh-preview(); } }
             }
 
