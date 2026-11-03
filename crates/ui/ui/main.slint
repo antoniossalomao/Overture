@@ -88,20 +88,35 @@ component TopMenuTrigger inherits Rectangle {
     in property <string> label;
     callback clicked();
 
-    height: 22px;
-    width: txt.preferred-width + 10px;
-    border-radius: 4px;
-    background: ta.has-hover ? ShadTheme.accent : transparent;
+    // Ocupa a altura inteira da barra (26px) para todos os itens ficarem na mesma linha de base,
+    // independente do container onde são colocados.
+    height: 26px;
+    width: txt.preferred-width + 16px;
+    background: transparent;
+
+    hover-bg := Rectangle {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        border-radius: 4px;
+        background: ta.has-hover ? ShadTheme.accent : transparent;
+    }
 
     txt := Text {
+        x: 8px;
+        width: parent.width - 16px;
+        height: parent.height;
         text: root.label;
-        font-size: 11px;
+        font-size: 12px;
         color: ta.has-hover ? ShadTheme.fg : ShadTheme.fg-secondary;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
 
     ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
@@ -469,7 +484,7 @@ export component MainWindow inherits Window {
 
                     // Left Menus
                     HorizontalLayout {
-                        spacing: 1px;
+                        spacing: 2px;
                         alignment: start;
 
                         // Brand Mark
