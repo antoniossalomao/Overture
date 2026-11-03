@@ -40,6 +40,14 @@
 | `B` | Alternar Tela Preta (*Blackout*) |
 | `C` | Alternar Limpar Texto (mantém o fundo/vídeo ativo) |
 | `L` | Alternar Modo Logo |
+| `Enter` (aba Letras, fora da busca) | Projeta a música selecionada na biblioteca |
+| `Alt + Seta Cima` / `Alt + Seta Baixo` | Move a seleção na lista de músicas e a carrega no painel |
+| `Enter` na busca | Projeta o primeiro resultado da busca |
+| `Ctrl + F` | Foca a busca de letras |
+
+**Ordem do culto:** arraste um item para cima ou para baixo para reordenar. Um clique curto projeta o item.
+
+**Busca de letras:** a pesquisa procura no título e no texto das letras. Músicas com o termo no título aparecem antes.
 
 ---
 

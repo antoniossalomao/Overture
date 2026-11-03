@@ -35,6 +35,9 @@ Aplicativo desktop nativo **100% Rust puro** (zero JavaScript / WebView2) para *
   - Tema com fonte, tamanho, cor, sombra, **itálico**, **brilho (glow)**, **texto em maiúsculas** (padrão no monitor de retorno), fundo sólido/gradiente/imagem/vídeo ou fundo animado.
   - **Relógio HH:MM** no canto da saída principal e **transição fade** entre slides (duração definida no tema).
   - Apresentação automática com opção **repetir ou parar no último slide**.
+  - **Atalhos de biblioteca:** Enter projeta a música selecionada, Alt+↑/↓ move a seleção, Enter na busca projeta o primeiro resultado.
+  - **Ordem do culto por arraste:** arraste um item para reordenar; clique curto projeta.
+  - Abas da biblioteca e itens de menu com ícones.
 - **Fundos de Letra Animados (`crates/media`)**
   - 30 estilos escuros gerados do zero (bokeh, ondas, orbes, raios, névoa, grade, chuva), todos em loop de 24 s a 30 fps.
   - Tocados em tempo real pelo gerador procedural ou, quando existir `assets/motion/<nome>.mp4`, via libmpv em loop (menos CPU).
