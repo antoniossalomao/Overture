@@ -3443,6 +3443,16 @@ async fn seed_initial_demo_data_if_empty(storage: &Storage) -> Result<()> {
         ("Motion — Aurora Boreal", "motion://aurora"),
         ("Motion — Oceano Profundo", "motion://ocean"),
         ("Motion — Âmbar Dourado", "motion://warm"),
+        ("Motion — Grafite", "motion://graphite"),
+        ("Motion — Névoa Carvão", "motion://charcoal-fog"),
+        ("Motion — Meia-Noite", "motion://midnight"),
+        ("Motion — Brasa Apagada", "motion://ember-dim"),
+        ("Motion — Violeta Escuro", "motion://violet-haze"),
+        ("Motion — Verde-Azulado Profundo", "motion://teal-deep"),
+        ("Motion — Crepúsculo Rosé", "motion://dusk-rose"),
+        ("Motion — Aço Azulado", "motion://steel-blue"),
+        ("Motion — Oliva Escuro", "motion://olive-dark"),
+        ("Motion — Tinta e Partículas", "motion://ink-specks"),
     ] {
         storage
             .upsert_media(&MediaItem {
