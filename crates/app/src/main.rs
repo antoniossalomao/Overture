@@ -2864,6 +2864,21 @@ fn refresh_schedule_and_reports_ui(ui: &MainWindow, c: &AppContext, wk_idx: i32)
         None
     };
 
+    if ui.get_report_by_group() {
+        if let Ok(groups) = c.rt.block_on(c.storage.report_plays_by_group(None, None, weekday)) {
+            let rows: Vec<UiReportRow> = groups
+                .into_iter()
+                .map(|(name, count)| UiReportRow {
+                    title: name.into(),
+                    artist: "".into(),
+                    executions: count as i32,
+                })
+                .collect();
+            ui.set_report_rows(ModelRc::new(VecModel::from(rows)));
+        }
+        return;
+    }
+
     if let Ok(stats) = c
         .rt
         .block_on(c.storage.report_most_played_songs(None, None, weekday, 60))

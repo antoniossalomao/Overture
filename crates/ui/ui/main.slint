@@ -306,6 +306,7 @@ export component MainWindow inherits Window {
     // Schedule & Reports
     in-out property <[UiScheduleRow]> schedule-rows: [];
     in-out property <[UiReportRow]> report-rows: [];
+    in-out property <bool> report-by-group: false;
     in-out property <int> report-weekday-index: 0;
 
     // Settings & Remote
@@ -1922,6 +1923,7 @@ export component MainWindow inherits Window {
         if root.active-modal == 6 : ScheduleReportsModal {
             schedule-rows: root.schedule-rows;
             report-rows: root.report-rows;
+            report-by-group <=> root.report-by-group;
             weekday-idx <=> root.report-weekday-index;
             close => { root.active-modal = 0; }
             add-schedule(m, r) => { root.add-team-schedule(m, r); }

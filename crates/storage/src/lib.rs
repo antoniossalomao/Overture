@@ -1261,6 +1261,41 @@ impl Storage {
             .collect())
     }
 
+    /// Execuções por grupo de músicas (músicas sem grupo aparecem como "Sem grupo").
+    pub async fn report_plays_by_group(
+        &self,
+        from_iso: Option<&str>,
+        to_iso: Option<&str>,
+        weekday: Option<u32>,
+    ) -> Result<Vec<(String, i64)>> {
+        let rows = sqlx::query(
+            r#"SELECT COALESCE(g.name, 'Sem grupo') AS group_name, COUNT(e.id) AS play_count
+               FROM execution_log e
+               JOIN songs s ON s.id = COALESCE(
+                   e.song_id,
+                   (SELECT si.ref_id FROM service_items si WHERE si.id = e.service_item_id AND si.kind = 'song')
+               )
+               LEFT JOIN groups g ON g.id = s.group_id
+               WHERE (? IS NULL OR e.executed_at >= ?)
+                 AND (? IS NULL OR e.executed_at <= ?)
+                 AND (? IS NULL OR CAST(strftime('%w', e.executed_at) AS INTEGER) = ?)
+               GROUP BY group_name
+               ORDER BY play_count DESC, group_name COLLATE NOCASE ASC"#,
+        )
+        .bind(from_iso)
+        .bind(from_iso)
+        .bind(to_iso)
+        .bind(to_iso)
+        .bind(weekday.map(|w| w as i64))
+        .bind(weekday.map(|w| w as i64))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.get::<String, _>("group_name"), r.get::<i64, _>("play_count")))
+            .collect())
+    }
+
     // ==================== SETTINGS ====================
 
     pub async fn load_settings(&self) -> Result<AppSettings> {

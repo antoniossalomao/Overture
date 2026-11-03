@@ -864,6 +864,7 @@ export component ScheduleReportsModal inherits ModalShell {
     in-out property <string> role-input: "";
     in property <[UiScheduleRow]> schedule-rows: [];
     in property <[UiReportRow]> report-rows: [];
+    in-out property <bool> report-by-group: false;
     in property <[string]> weekday-options: ["Todos os dias", "Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
     in-out property <int> weekday-idx: 0;
 
@@ -944,12 +945,21 @@ export component ScheduleReportsModal inherits ModalShell {
                 spacing: 8px;
                 HorizontalLayout {
                     alignment: space-between;
-                    Text { text: "Músicas Mais Tocadas"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
-                    ShadSelect {
-                        width: 155px;
-                        model: root.weekday-options;
-                        current-index <=> root.weekday-idx;
-                        selected(idx) => { root.filter-weekday(idx); }
+                    Text { text: root.report-by-group ? "Execuções por Grupo" : "Músicas Mais Tocadas"; font-size: 12px; font-weight: 600; color: ShadTheme.fg; vertical-alignment: center; }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        ShadButton {
+                            size: "xs";
+                            variant: root.report-by-group ? "secondary" : "outline";
+                            label: root.report-by-group ? "Por grupo" : "Por música";
+                            clicked => { root.report-by-group = !root.report-by-group; root.filter-weekday(root.weekday-idx); }
+                        }
+                        ShadSelect {
+                            width: 155px;
+                            model: root.weekday-options;
+                            current-index <=> root.weekday-idx;
+                            selected(idx) => { root.filter-weekday(idx); }
+                        }
                     }
                 }
 
