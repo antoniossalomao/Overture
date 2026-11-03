@@ -1,7 +1,8 @@
 use crate::win32::{apply_win32_fullscreen, enumerate_monitors};
 use anyhow::{Context, Result};
-use overture_core::{MonitorDescriptor, OutputRole, OutputState, now_epoch_us};
-use overture_render::{GpuContext, SharedVideoFrame, SlideCompositor, SurfacePresenter};
+use overture_core::{MonitorDescriptor, OutputRole, OutputState, TransitionKind, now_epoch_us};
+use overture_render::{GpuContext, RgbaFrame, SharedVideoFrame, SlideCompositor, SurfacePresenter};
+use std::time::Instant;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -69,6 +70,12 @@ struct ManagedWindow {
     window: Arc<Window>,
     presenter: SurfacePresenter,
     last_rendered_revision: u64,
+    /// Último quadro publicado (base para o cross-fade).
+    last_frame: Option<RgbaFrame>,
+    /// Chave do slide exibido, para detectar troca de slide.
+    last_slide_key: Option<String>,
+    /// Cross-fade em andamento: início, duração e quadro anterior.
+    fade: Option<(Instant, u32, RgbaFrame)>,
 }
 
 struct OutputAppHandler {
@@ -196,6 +203,9 @@ impl OutputAppHandler {
                                     window,
                                     presenter,
                                     last_rendered_revision: 0,
+                                    last_frame: None,
+                                    last_slide_key: None,
+                                    fade: None,
                                 },
                             );
                             self.gpu = Some(ctx);
@@ -241,6 +251,9 @@ impl OutputAppHandler {
                         window,
                         presenter,
                         last_rendered_revision: 0,
+                        last_frame: None,
+                        last_slide_key: None,
+                        fade: None,
                     },
                 );
                 info!(
@@ -280,9 +293,41 @@ impl OutputAppHandler {
             .and_then(|rx| rx.borrow().clone());
         let vf_view = vf_shared.as_ref().map(|v| v.as_view());
 
-        let frame = self
+        let mut frame = self
             .compositor
             .compose(&state, win.role, size.width, size.height, vf_view);
+
+        // Cross-fade: ao trocar de slide, mistura o quadro anterior com o novo pela duração do tema.
+        let slide_key = format!(
+            "{:?}|{}|{}",
+            state.display_mode,
+            state.current_slide_index,
+            state.current_slide().map(|s| s.text.as_str()).unwrap_or("")
+        );
+        if win.last_slide_key.as_deref() != Some(slide_key.as_str()) {
+            if let (Some(prev), TransitionKind::Fade { duration_ms }) =
+                (win.last_frame.take(), state.main_theme.transition)
+            {
+                if prev.width == frame.width && prev.height == frame.height && duration_ms > 0 {
+                    win.fade = Some((Instant::now(), duration_ms, prev));
+                }
+            }
+            win.last_slide_key = Some(slide_key);
+        }
+        if let Some((start, dur_ms, prev)) = &win.fade {
+            let t = (start.elapsed().as_millis() as f32 / *dur_ms as f32).clamp(0.0, 1.0);
+            let k = (t * 255.0) as u32;
+            let inv = 255 - k;
+            for (dst, p) in frame.pixels.iter_mut().zip(prev.pixels.iter()) {
+                *dst = ((*p as u32 * inv + *dst as u32 * k) / 255) as u8;
+            }
+            if t >= 1.0 {
+                win.fade = None;
+            } else {
+                win.window.request_redraw();
+            }
+        }
+        win.last_frame = Some(frame.clone());
 
         if let Err(e) = win.presenter.present(gpu, &frame) {
             warn!("Frame present warning on {:?}: {}", win.role, e);
