@@ -925,6 +925,13 @@ impl Storage {
         query: &str,
         limit: i64,
     ) -> Result<Vec<BibleVerse>> {
+        // Filtros: @AT, @NT, @livro:N (1..66), @cap:N. O restante é a busca por palavras.
+        let (text_part, filters) = split_bible_filters(query.trim());
+        if !filters.is_empty() {
+            return self
+                .search_bible_filtered(version_id, &text_part, &filters, limit)
+                .await;
+        }
         let trimmed = query.trim();
         if trimmed.is_empty() {
             let rows = sqlx::query(
@@ -985,6 +992,48 @@ impl Storage {
         sql.push_str(" ORDER BY book_order ASC, chapter ASC, verse ASC LIMIT ?");
 
         let mut q = sqlx::query(&sql).bind(version_id);
+        for tok in &tokens {
+            q = q.bind(format!("%{tok}%"));
+        }
+        q = q.bind(limit);
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(row_to_bible_verse).collect())
+    }
+
+    /// Busca com filtros (`@AT`, `@NT`, `@livro:N`, `@cap:N`) e palavras opcionais.
+    async fn search_bible_filtered(
+        &self,
+        version_id: i64,
+        text_part: &str,
+        filters: &[BibleFilter],
+        limit: i64,
+    ) -> Result<Vec<BibleVerse>> {
+        let folded = fold_search_text(text_part);
+        let tokens: Vec<&str> = folded.split_whitespace().collect();
+        let mut sql = String::from(
+            r#"SELECT version_id, book, book_order, chapter, verse, text
+               FROM bible_verses WHERE version_id = ?"#,
+        );
+        for f in filters {
+            match f {
+                BibleFilter::Old => sql.push_str(" AND book_order <= 39"),
+                BibleFilter::New => sql.push_str(" AND book_order >= 40"),
+                BibleFilter::Book(_) => sql.push_str(" AND book_order = ?"),
+                BibleFilter::Chapter(_) => sql.push_str(" AND chapter = ?"),
+            }
+        }
+        for _ in &tokens {
+            sql.push_str(" AND search_blob LIKE ?");
+        }
+        sql.push_str(" ORDER BY book_order ASC, chapter ASC, verse ASC LIMIT ?");
+
+        let mut q = sqlx::query(&sql).bind(version_id);
+        for f in filters {
+            match f {
+                BibleFilter::Book(n) | BibleFilter::Chapter(n) => q = q.bind(*n),
+                _ => {}
+            }
+        }
         for tok in &tokens {
             q = q.bind(format!("%{tok}%"));
         }
@@ -1557,5 +1606,65 @@ mod tests {
         restored_store.close().await;
 
         Ok(())
+    }
+}
+
+/// Filtro de busca bíblica (`@AT`, `@NT`, `@livro:N`, `@cap:N`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BibleFilter {
+    Old,
+    New,
+    Book(i64),
+    Chapter(i64),
+}
+
+/// Separa os filtros `@...` do texto da busca. Filtros inválidos são ignorados como texto.
+pub fn split_bible_filters(query: &str) -> (String, Vec<BibleFilter>) {
+    let mut filters = Vec::new();
+    let mut words = Vec::new();
+    for tok in query.split_whitespace() {
+        let Some(rest) = tok.strip_prefix('@') else {
+            words.push(tok);
+            continue;
+        };
+        let lower = rest.to_ascii_lowercase();
+        let parsed = if lower == "at" {
+            Some(BibleFilter::Old)
+        } else if lower == "nt" {
+            Some(BibleFilter::New)
+        } else if let Some(n) = lower.strip_prefix("livro:").and_then(|v| v.parse::<i64>().ok()) {
+            (1..=66).contains(&n).then_some(BibleFilter::Book(n))
+        } else if let Some(n) = lower.strip_prefix("cap:").and_then(|v| v.parse::<i64>().ok()) {
+            (n >= 1).then_some(BibleFilter::Chapter(n))
+        } else {
+            None
+        };
+        match parsed {
+            Some(f) => filters.push(f),
+            None => words.push(tok),
+        }
+    }
+    (words.join(" "), filters)
+}
+
+#[cfg(test)]
+mod bible_filter_tests {
+    use super::*;
+
+    #[test]
+    fn parses_filters_and_keeps_text() {
+        let (text, f) = split_bible_filters("amor @NT @cap:3");
+        assert_eq!(text, "amor");
+        assert_eq!(f, vec![BibleFilter::New, BibleFilter::Chapter(3)]);
+        let (text, f) = split_bible_filters("@livro:43 luz");
+        assert_eq!(text, "luz");
+        assert_eq!(f, vec![BibleFilter::Book(43)]);
+    }
+
+    #[test]
+    fn ignores_invalid_filters_as_text() {
+        let (text, f) = split_bible_filters("@livro:99 @xyz");
+        assert_eq!(text, "@livro:99 @xyz");
+        assert!(f.is_empty());
     }
 }
