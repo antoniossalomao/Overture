@@ -23,8 +23,22 @@ pub enum MediaCommand {
     },
     SetPaused(bool),
     SetVolume(u8),
+    /// Move a reprodução atual para `segundos` (absoluto).
+    Seek(f64),
     Stop,
     Shutdown,
+}
+
+/// Estado do player publicado ~4×/s para a interface (painel Player).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MediaStatus {
+    /// Caminho da mídia em primeiro plano ("" = nada tocando).
+    pub path: String,
+    pub is_audio: bool,
+    pub paused: bool,
+    pub position_secs: f64,
+    pub duration_secs: f64,
+    pub volume: u8,
 }
 
 /// Asynchronous media engine driving `libmpv` video/audio playback and procedural motion backgrounds,
@@ -34,12 +48,14 @@ pub struct MediaEngine {
     cmd_tx: Sender<MediaCommand>,
     frame_rx: watch::Receiver<Option<SharedVideoFrame>>,
     libmpv_available: Arc<AtomicBool>,
+    status_rx: watch::Receiver<MediaStatus>,
 }
 
 impl MediaEngine {
     pub fn spawn(render_width: u32, render_height: u32) -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel::<MediaCommand>();
         let (frame_tx, frame_rx) = watch::channel::<Option<SharedVideoFrame>>(None);
+        let (status_tx, status_rx) = watch::channel(MediaStatus { volume: 100, ..Default::default() });
         let libmpv_available = Arc::new(AtomicBool::new(probe_libmpv_path().is_some()));
         let mpv_flag = libmpv_available.clone();
 
@@ -63,6 +79,9 @@ impl MediaEngine {
                 let h = render_height.max(36);
                 let mut active_mode: ActivePlayback = ActivePlayback::Idle;
                 let mut paused = false;
+                let mut fg_path = String::new();
+                let mut volume: u8 = 100;
+                let mut tick: u32 = 0;
                 let start_instant = Instant::now();
                 let frame_interval = Duration::from_micros(33_333); // 30 fps
 
@@ -122,6 +141,7 @@ impl MediaEngine {
                                 loop_playback,
                             } => {
                                 paused = false;
+                                fg_path = path.clone();
                                 match kind {
                                     MediaKind::Video => {
                                         if let Some(p) = &mut mpv
@@ -159,12 +179,19 @@ impl MediaEngine {
                                     p.set_paused(p_state);
                                 }
                             }
+                            MediaCommand::Seek(secs) => {
+                                if let Some(p) = &mut mpv {
+                                    p.seek_secs(secs);
+                                }
+                            }
                             MediaCommand::SetVolume(vol) => {
+                                volume = vol.min(100);
                                 if let Some(p) = &mut mpv {
                                     p.set_volume(vol);
                                 }
                             }
                             MediaCommand::Stop => {
+                                fg_path.clear();
                                 active_mode = ActivePlayback::Idle;
                                 if let Some(p) = &mut mpv {
                                     p.stop();
@@ -173,6 +200,31 @@ impl MediaEngine {
                             }
                             MediaCommand::Shutdown => return,
                         }
+                    }
+
+                    // Publica o estado do player a cada ~250 ms (a cada 8 quadros).
+                    tick = tick.wrapping_add(1);
+                    if tick % 8 == 0 {
+                        let (pos, dur) = match (&mpv, fg_path.is_empty()) {
+                            (Some(p), false) => (p.position_secs().unwrap_or(0.0), p.duration_secs().unwrap_or(0.0)),
+                            _ => (0.0, 0.0),
+                        };
+                        let st = MediaStatus {
+                            path: fg_path.clone(),
+                            is_audio: matches!(active_mode, ActivePlayback::AudioOnly),
+                            paused,
+                            position_secs: pos,
+                            duration_secs: dur,
+                            volume,
+                        };
+                        status_tx.send_if_modified(|cur| {
+                            if *cur != st {
+                                *cur = st;
+                                true
+                            } else {
+                                false
+                            }
+                        });
                     }
 
                     if !paused {
@@ -215,7 +267,12 @@ impl MediaEngine {
             cmd_tx,
             frame_rx,
             libmpv_available,
+            status_rx,
         }
+    }
+
+    pub fn subscribe_status(&self) -> watch::Receiver<MediaStatus> {
+        self.status_rx.clone()
     }
 
     pub fn send(&self, cmd: MediaCommand) {

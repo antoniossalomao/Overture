@@ -228,6 +228,22 @@ export component MainWindow inherits Window {
     in-out property <float> onboarding-progress: 0;
     in-out property <string> onboarding-message: "";
     in-out property <string> onboarding-detail: "";
+    // Player (coluna da direita)
+    in-out property <string> player-title: "";
+    in-out property <float> player-pos: 0;
+    in-out property <float> player-dur: 0;
+    in-out property <bool> player-paused: false;
+    in-out property <bool> player-active: false;
+    in-out property <float> player-volume: 100;
+    callback player-toggle-pause();
+    callback player-stop();
+    callback player-seek(float);
+    callback player-volume-changed(float);
+    callback player-prev();
+    callback player-next();
+    pure function fmt-time(t: float) -> string {
+        return Math.floor(t / 60) + ":" + (Math.mod(t, 60) < 10 ? "0" : "") + Math.floor(Math.mod(t, 60));
+    }
     callback onboarding-start();
     callback onboarding-skip();
     callback onboarding-finish();
@@ -1523,6 +1539,91 @@ export component MainWindow inherits Window {
                     VerticalLayout {
                         spacing: 0px;
 
+                        // Painel Player: faixa atual, tempo, transporte, volume e saída
+                        Rectangle {
+                            height: 74px;
+                            background: ShadTheme.panel;
+                            VerticalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                padding-top: 6px;
+                                padding-bottom: 6px;
+                                spacing: 5px;
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    LucideIcon { name: "music"; icon-size: 12px; tint: root.player-active ? ShadTheme.live-blue-bright : ShadTheme.fg-muted; }
+                                    Text {
+                                        horizontal-stretch: 1;
+                                        text: root.player-active ? root.player-title : "Player — nenhuma faixa";
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        color: root.player-active ? ShadTheme.fg : ShadTheme.fg-muted;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.fmt-time(root.player-pos) + " / " + root.fmt-time(root.player-dur);
+                                        font-size: 11px;
+                                        color: ShadTheme.fg-muted;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                // Barra de progresso (clique para buscar)
+                                Rectangle {
+                                    height: 8px;
+                                    border-radius: 4px;
+                                    background: ShadTheme.muted;
+                                    clip: true;
+                                    Rectangle {
+                                        x: 0px;
+                                        width: root.player-dur > 0 ? parent.width * clamp(root.player-pos / root.player-dur, 0, 1) : 0px;
+                                        background: ShadTheme.live-blue-bright;
+                                    }
+                                    TouchArea {
+                                        enabled: root.player-active && root.player-dur > 0;
+                                        mouse-cursor: pointer;
+                                        clicked => { root.player-seek(self.mouse-x / self.width * root.player-dur); }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 3px;
+                                    ShadIconButton { icon: "skip-prev"; box-size: 24px; clicked => { root.player-prev(); } }
+                                    ShadIconButton { icon: root.player-paused || !root.player-active ? "play" : "pause"; box-size: 24px; active: root.player-active && !root.player-paused; clicked => { root.player-toggle-pause(); } }
+                                    ShadIconButton { icon: "skip-next"; box-size: 24px; clicked => { root.player-next(); } }
+                                    ShadIconButton { icon: "stop"; box-size: 24px; clicked => { root.player-stop(); } }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        LucideIcon { name: "monitor"; icon-size: 13px; tint: ShadTheme.fg-muted; }
+                                    }
+                                    // Volume (clique para ajustar)
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 70px;
+                                            height: 6px;
+                                            border-radius: 3px;
+                                            background: ShadTheme.muted;
+                                            clip: true;
+                                            Rectangle {
+                                                x: 0px;
+                                                width: parent.width * clamp(root.player-volume / 100, 0, 1);
+                                                background: ShadTheme.fg-secondary;
+                                            }
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.player-volume-changed(self.mouse-x / self.width * 100); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                        }
+
                         // Top Engine / Role Header (like Holyrics "VLC Player" bar, upgraded!)
                         Rectangle {
                             height: 28px;
@@ -1567,7 +1668,7 @@ export component MainWindow inherits Window {
                                 width: min(self.max-w, self.max-h * 16 / 9);
                                 height: self.width * 9 / 16;
                                 x: (parent.width - self.width) / 2;
-                                y: (parent.height - self.height) / 2;
+                                y: 8px;
                                 background: #000000;
                                 border-radius: 4px;
                                 border-width: 1px;

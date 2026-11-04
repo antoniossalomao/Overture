@@ -92,6 +92,11 @@ fn demo(ui: &MainWindow) {
         .collect();
     ui.set_active_slides(ModelRc::new(VecModel::from(cards)));
     ui.set_current_slide_index(1);
+    ui.set_player_active(true);
+    ui.set_player_title("Emaús — playback.mp3".into());
+    ui.set_player_pos(83.0);
+    ui.set_player_dur(241.0);
+    ui.set_player_volume(70.0);
     let pl = |i, n: &str, a: &str| UiPlaylistRow {
         item_id: i,
         row_idx: i - 1,
