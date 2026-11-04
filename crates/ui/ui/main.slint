@@ -232,6 +232,9 @@ export component MainWindow inherits Window {
     in-out property <bool> is-clear-text: false;
     in-out property <bool> auto-play-enabled: false;
     in-out property <bool> auto-play-repeat: true;
+    // Tom e BPM da música ativa (vazios = só o título). Ainda sem fonte nos metadados.
+    in-out property <string> active-key: "";
+    in-out property <string> active-bpm: "";
 
     // Column 1: Library
     in-out property <int> left-lib-tab: 0; // 0 Letras, 1 Texto, 2 Áudio, 3 Vídeo, 4 Imagem
@@ -1254,22 +1257,41 @@ export component MainWindow inherits Window {
                                     box-size: 24px;
                                     clicked => { root.next-slide(); }
                                 }
-                                ShadIconButton {
-                                    icon: "repeat";
-                                    box-size: 24px;
-                                    active: root.auto-play-enabled;
-                                    clicked => {
-                                        root.auto-play-enabled = !root.auto-play-enabled;
-                                        root.toggle-auto-play(root.auto-play-enabled);
+                                Rectangle {
+                                    width: 24px;
+                                    height: 24px;
+                                    ShadIconButton {
+                                        icon: "repeat";
+                                        box-size: 24px;
+                                        active: root.auto-play-enabled;
+                                        clicked => { pop-repeat.show(); }
                                     }
-                                }
-                                ShadButton {
-                                    size: "xs";
-                                    label: root.auto-play-repeat ? "Repetir" : "Parar no fim";
-                                    variant: "secondary";
-                                    clicked => {
-                                        root.auto-play-repeat = !root.auto-play-repeat;
-                                        root.toggle-auto-play-repeat(root.auto-play-repeat);
+                                    pop-repeat := PopupWindow {
+                                        x: 0px; y: 26px; width: 200px;
+                                        height: rep-vbox.preferred-height + 2px;
+                                        Rectangle {
+                                            width: 100%; height: 100%;
+                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                            rep-vbox := VerticalLayout {
+                                                padding: 4px; spacing: 1px;
+                                                MenuActionRow {
+                                                    label: root.auto-play-enabled ? "Parar avanço automático" : "Avanço automático";
+                                                    icon: "play";
+                                                    triggered => {
+                                                        root.auto-play-enabled = !root.auto-play-enabled;
+                                                        root.toggle-auto-play(root.auto-play-enabled);
+                                                    }
+                                                }
+                                                MenuActionRow {
+                                                    label: root.auto-play-repeat ? "Parar no fim" : "Repetir";
+                                                    icon: "repeat";
+                                                    triggered => {
+                                                        root.auto-play-repeat = !root.auto-play-repeat;
+                                                        root.toggle-auto-play-repeat(root.auto-play-repeat);
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 Rectangle { width: 1px; height: 14px; y: 10px; background: ShadTheme.border; }
@@ -1306,6 +1328,11 @@ export component MainWindow inherits Window {
                                     }
                                 }
                                 ShadIconButton {
+                                    icon: "music";
+                                    box-size: 24px;
+                                    clicked => { root.left-lib-tab = 0; }
+                                }
+                                ShadIconButton {
                                     icon: "trash";
                                     box-size: 24px;
                                     danger: true;
@@ -1317,6 +1344,21 @@ export component MainWindow inherits Window {
                                         }
                                     }
                                 }
+                            }
+                            Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                        }
+
+                        // Linha de tom e BPM ("Fm | BPM: 87"); some quando não há metadados
+                        if root.active-key != "" || root.active-bpm != "" : Rectangle {
+                            height: 24px;
+                            background: ShadTheme.bg;
+                            Text {
+                                x: 10px; width: parent.width - 20px; height: 100%;
+                                text: root.active-key + (root.active-key != "" && root.active-bpm != "" ? "  |  " : "") + (root.active-bpm != "" ? "BPM: " + root.active-bpm : "");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: ShadTheme.fg-muted;
+                                vertical-alignment: center;
                             }
                             Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
                         }
@@ -1385,6 +1427,7 @@ export component MainWindow inherits Window {
                             content-height: slides-vbox.preferred-height + 12px;
 
                             slides-vbox := VerticalLayout {
+                                alignment: start;
                                 width: parent.width;
                                 spacing: root.slides-grid-mode ? 6px : 0px;
                                 padding: root.slides-grid-mode ? 8px : 0px;
@@ -1412,6 +1455,16 @@ export component MainWindow inherits Window {
                                         spacing: 8px;
 
                                         Text {
+                                            width: 16px;
+                                            text: sc.number-label;
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: sc.slide-idx == root.current-slide-index ? #ffffffcc : ShadTheme.fg-muted;
+                                            vertical-alignment: top;
+                                            horizontal-alignment: right;
+                                        }
+
+                                        Text {
                                             horizontal-stretch: 1;
                                             text: sc.body;
                                             font-size: 12px;
@@ -1424,6 +1477,11 @@ export component MainWindow inherits Window {
                                         if sc.forced-break : VerticalLayout {
                                             alignment: center;
                                             ShadBadge { text: "revisar"; variant: "amber"; }
+                                        }
+
+                                        if sc.slide-idx == root.current-slide-index : VerticalLayout {
+                                            alignment: center;
+                                            LucideIcon { name: "check"; icon-size: 14px; tint: #ffffff; }
                                         }
                                     }
 
