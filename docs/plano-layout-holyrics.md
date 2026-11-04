@@ -155,8 +155,11 @@ Cada fase tem arquivos, critério de aceite e verificação.
 - Checklist no Windows, a cargo do usuário: prévia atualiza ao trocar de slide, tema aplica pela faixa, player toca
   e para, histórico recolhe, filtros da biblioteca funcionam.
 
-## 8. Decisões que preciso de você
+## 8. Decisões tomadas
 
-1. A prévia 16:9 vai para a coluna da direita (como no Holyrics)? Ou prefere manter no centro?
-2. O player de áudio entra nesta rodada (fase 4 completa) ou depois?
-3. Mantemos os textos em português e o nome "Overture" nas abas, mesmo com a estrutura do Holyrics?
+1. **Prévia 16:9 na coluna da direita**, como no Holyrics (acima do rodapé de temas e configurações).
+2. **Player de áudio nesta rodada** (fase 4 completa, com os comandos de áudio no engine).
+3. **Textos em português e o nome "Overture" nas abas**, mantendo a estrutura do Holyrics.
+
+Com essas decisões, a fase 4 passa a ser a maior do plano. Ela pode ser dividida em duas entregas
+(prévia na direita primeiro, player depois) se o cronograma apertar.
