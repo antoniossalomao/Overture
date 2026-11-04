@@ -716,6 +716,8 @@ pub struct AppSettings {
     pub recurring_weekday: u32,
     /// Nome dos cultos criados pela recorrência.
     pub recurring_service_name: String,
+    /// `true` depois que a tela de primeira execução (download das letras) foi concluída ou pulada.
+    pub onboarding_done: bool,
 }
 
 impl Default for AppSettings {
@@ -730,6 +732,7 @@ impl Default for AppSettings {
             monitor_assignment: MonitorAssignment::default(),
             recurring_weekday: 0,
             recurring_service_name: "Culto Dominical".to_string(),
+            onboarding_done: false,
         }
     }
 }

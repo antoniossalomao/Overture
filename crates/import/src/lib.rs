@@ -2,6 +2,7 @@
 
 pub mod bible_import;
 pub mod export;
+pub mod pack;
 pub mod pptx;
 pub mod txt;
 pub mod xml_songs;
@@ -11,6 +12,7 @@ pub use export::{
     OvertureJsonBundle, export_json_bundle_to_file, export_song_to_txt_string,
     export_songs_to_txt_directory, import_json_bundle_from_file,
 };
+pub use pack::{PACK_BATCH_SIZE, read_letras_pack};
 pub use pptx::{ParsedPptxPresentation, parse_pptx_bytes, parse_pptx_file};
 
 pub use txt::{

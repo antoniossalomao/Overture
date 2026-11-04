@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod onboarding;
+
 use anyhow::Result;
 use chrono::Timelike;
 use directories::ProjectDirs;
@@ -211,6 +213,11 @@ fn main() -> Result<()> {
     rt.block_on(seed_initial_demo_data_if_empty(&storage))?;
 
     let settings = rt.block_on(storage.load_settings()).unwrap_or_default();
+    let onboarding_done = settings.onboarding_done;
+    let onboarding_dir = db_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(std::env::temp_dir);
     let locale = Locale::from_code(&settings.locale);
     let i18n = I18n::new(locale);
 
@@ -412,6 +419,15 @@ fn main() -> Result<()> {
             }
         });
     }
+
+    onboarding::wire(
+        &ui,
+        ctx.borrow().storage.clone(),
+        rt.clone(),
+        onboarding_dir,
+        onboarding_done,
+        is_headless_test,
+    );
 
     ui.run()?;
 

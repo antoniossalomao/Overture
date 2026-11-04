@@ -14,6 +14,7 @@ import {
     ShadColSplitter,
     ShadScrollArea
 } from "components.slint";
+import { OnboardingScreen } from "onboarding.slint";
 import {
     UiBibleBookTile,
     UiBibleBookGridRow,
@@ -222,6 +223,14 @@ export component MainWindow inherits Window {
     // Active Modal: 0 = None, 1 = Countdown, 2 = SongEditor, 3 = ThemeStudio, 4 = DisplaySettings, 5 = Scoreboard/Alert, 6 = Schedule/Reports, 7 = Settings/Remote
     in-out property <int> active-modal: 0;
     in-out property <string> status-banner: "";
+    // Onboarding (primeira execução): -1 oculto, 0 boas-vindas, 1 baixando, 2 pronto, 3 erro
+    in-out property <int> onboarding-step: -1;
+    in-out property <float> onboarding-progress: 0;
+    in-out property <string> onboarding-message: "";
+    in-out property <string> onboarding-detail: "";
+    callback onboarding-start();
+    callback onboarding-skip();
+    callback onboarding-finish();
 
     // Top Header & Active Item
     in-out property <string> active-header-title: "Selecione uma música ou versículo";
@@ -2105,5 +2114,15 @@ export component MainWindow inherits Window {
             trigger-export-txt-dialog => { root.dialog-export-txt(); }
             trigger-export-json-dialog => { root.dialog-export-json(); }
         }
+    }
+
+    if root.onboarding-step >= 0 : OnboardingScreen {
+        step: root.onboarding-step;
+        progress: root.onboarding-progress;
+        message: root.onboarding-message;
+        detail: root.onboarding-detail;
+        start => { root.onboarding-start(); }
+        skip => { root.onboarding-skip(); }
+        finish => { root.onboarding-finish(); }
     }
 }

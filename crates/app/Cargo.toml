@@ -31,6 +31,7 @@ chrono.workspace = true
 serde_json.workspace = true
 windows-sys.workspace = true
 rfd.workspace = true
+reqwest.workspace = true
 image.workspace = true
 
 [build-dependencies]

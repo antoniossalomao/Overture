@@ -23,6 +23,18 @@ fn main() {
     if std::env::var("SNAP_DEMO").is_ok() {
         demo(&ui);
     }
+    if let Ok(step) = std::env::var("SNAP_ONBOARDING") {
+        let step: i32 = step.parse().unwrap();
+        ui.set_onboarding_step(step);
+        ui.set_onboarding_progress(0.42);
+        ui.set_onboarding_message(match step {
+            1 => "Importando as letras para a biblioteca...".into(),
+            2 => "152.304 letras importadas para a sua biblioteca.".into(),
+            3 => "Falha ao baixar/importar as letras: sem conexão com a internet".into(),
+            _ => "".into(),
+        });
+        ui.set_onboarding_detail("48.120 músicas importadas".into());
+    }
     win.set_size(PhysicalSize::new(w, h));
     ui.show().unwrap();
     let mut buf = vec![slint::Rgb8Pixel::default(); (w * h) as usize];
