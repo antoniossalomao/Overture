@@ -365,9 +365,10 @@ export component MainWindow inherits Window {
     in-out property <string> shortcut-logo: "L";
 
     // Resizable column widths (tuned to Holyrics proportions so 1024px+ fits all 5 columns cleanly)
-    property <length> col1-width: 250px;
-    property <length> col2-width: 300px;
-    property <length> col4-width: 200px;
+    // Proporções próximas ao Holyrics: biblioteca larga (abas inteiras), lista de slides no meio, prévia ao centro.
+    property <length> col1-width: 330px;
+    property <length> col2-width: 520px;
+    property <length> col4-width: 240px;
 
     // ==================== CALLBACKS ====================
     callback key-shortcut(string);

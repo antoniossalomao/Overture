@@ -2260,13 +2260,16 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             }
 
             let fullscreen = !windowed;
+            // Com um monitor só, a saída em tela cheia não pode ficar sempre no topo:
+            // senão cobre o painel do operador e ele não consegue voltar.
+            let multi_monitor = enumerate_monitors().len() > 1;
             if let Some(mgr) = &c.output_mgr {
                 apply_single_role_monitor(
                     mgr,
                     OutputRole::Main,
                     w.get_main_monitor_index(),
                     fullscreen,
-                    fullscreen,
+                    fullscreen && multi_monitor,
                 );
                 apply_single_role_monitor(
                     mgr,
