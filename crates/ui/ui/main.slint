@@ -1433,7 +1433,7 @@ export component MainWindow inherits Window {
                                 padding: root.slides-grid-mode ? 8px : 0px;
 
                                 for sc in root.active-slides : Rectangle {
-                                    min-height: max(40px, sl-row-layout.preferred-height);
+                                    min-height: max(28px, sl-row-layout.preferred-height);
                                     border-radius: root.slides-grid-mode ? 5px : 0px;
                                     border-width: root.slides-grid-mode ? 1px : 0px;
                                     border-color: sc.slide-idx == root.current-slide-index ? ShadTheme.live-blue-bright : ShadTheme.border;
@@ -1450,8 +1450,8 @@ export component MainWindow inherits Window {
                                         width: 100%;
                                         padding-left: 10px;
                                         padding-right: 8px;
-                                        padding-top: 7px;
-                                        padding-bottom: 7px;
+                                        padding-top: 3px;
+                                        padding-bottom: 3px;
                                         spacing: 8px;
 
                                         Text {
