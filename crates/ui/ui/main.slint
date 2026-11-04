@@ -366,9 +366,19 @@ export component MainWindow inherits Window {
 
     // Resizable column widths (tuned to Holyrics proportions so 1024px+ fits all 5 columns cleanly)
     // Proporções próximas ao Holyrics: biblioteca larga (abas inteiras), lista de slides no meio, prévia ao centro.
-    property <length> col1-width: 330px;
-    property <length> col2-width: 520px;
-    property <length> col4-width: 240px;
+    // Proporções do Holyrics 2.30 (318/671/549/255/95 px em 1917 px): biblioteca 17 %,
+    // slides 35 %, prévia 29 % (o resto), playlist 13 %, temas 5 %. -1px = automático
+    // (proporcional à janela); o arraste dos divisores grava um valor fixo.
+    // Cópia da largura da janela (evita laço de binding: root.width depende do layout).
+    property <length> win-w: 1200px;
+    changed width => { self.win-w = self.width; }
+    property <length> col1-user: -1px;
+    property <length> col2-user: -1px;
+    property <length> col4-user: -1px;
+    property <length> col1-width: root.col1-user >= 0px ? root.col1-user : clamp(root.win-w * 0.166, 165px, 420px);
+    property <length> col2-width: root.col2-user >= 0px ? root.col2-user : clamp(root.win-w * 0.35, 215px, 700px);
+    property <length> col4-width: root.col4-user >= 0px ? root.col4-user : clamp(root.win-w * 0.133, 145px, 360px);
+    property <length> theme-strip-width: clamp(root.win-w * 0.05, 64px, 95px);
 
     // ==================== CALLBACKS ====================
     callback key-shortcut(string);
@@ -1207,7 +1217,7 @@ export component MainWindow inherits Window {
                 }
 
                 ShadColSplitter {
-                    dragged(dx) => { root.col1-width = clamp(root.col1-width + dx, 165px, 420px); }
+                    dragged(dx) => { root.col1-user = clamp(root.col1-width + dx, 165px, 420px); }
                 }
 
                 // ---------- COLUMN 2: CENTER-LEFT ACTIVE SONG SLIDES ----------
@@ -1434,7 +1444,7 @@ export component MainWindow inherits Window {
                 }
 
                 ShadColSplitter {
-                    dragged(dx) => { root.col2-width = clamp(root.col2-width + dx, 215px, 540px); }
+                    dragged(dx) => { root.col2-user = clamp(root.col2-width + dx, 215px, 700px); }
                 }
 
                 // ---------- COLUMN 3: CENTER LIVE MONITOR PREVIEW ----------
@@ -1584,7 +1594,7 @@ export component MainWindow inherits Window {
                 }
 
                 ShadColSplitter {
-                    dragged(dx) => { root.col4-width = clamp(root.col4-width - dx, 145px, 360px); }
+                    dragged(dx) => { root.col4-user = clamp(root.col4-width - dx, 145px, 360px); }
                 }
 
                 // ---------- COLUMN 4: MÍDIA / ANOTAÇÕES + ORDEM DO CULTO ----------
@@ -1802,7 +1812,7 @@ export component MainWindow inherits Window {
                 }
 
                 if root.show-theme-strip : Rectangle {
-                    width: 78px;
+                    width: root.theme-strip-width;
                     background: ShadTheme.bg-bar;
 
                     VerticalLayout {
