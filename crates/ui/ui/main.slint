@@ -14,6 +14,7 @@ import {
     ShadColSplitter,
     ShadScrollArea
 } from "components.slint";
+import { TopMenuTrigger, LibTab, MenuActionRow } from "chrome.slint";
 import { OnboardingScreen } from "onboarding.slint";
 import {
     UiBibleBookTile,
@@ -83,120 +84,6 @@ export struct UiPlaylistRow {
     title: string,
     subtitle: string,
     is-media: bool,
-}
-
-component TopMenuTrigger inherits Rectangle {
-    in property <string> label;
-    callback clicked();
-
-    // Ocupa a altura inteira da barra (26px) para todos os itens ficarem na mesma linha de base,
-    // independente do container onde são colocados.
-    height: 26px;
-    width: txt.preferred-width + 16px;
-    background: transparent;
-
-    hover-bg := Rectangle {
-        x: 0px;
-        y: 3px;
-        width: parent.width;
-        height: parent.height - 6px;
-        border-radius: 4px;
-        background: ta.has-hover ? ShadTheme.accent : transparent;
-    }
-
-    txt := Text {
-        x: 8px;
-        width: parent.width - 16px;
-        height: parent.height;
-        text: root.label;
-        font-size: 12px;
-        color: ta.has-hover ? ShadTheme.fg : ShadTheme.fg-secondary;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-
-    ta := TouchArea {
-        width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
-component LibTab inherits Rectangle {
-    in property <string> label;
-    in property <string> icon;
-    in property <bool> active: false;
-    // Coluna estreita: só a aba ativa mostra o texto
-    in property <bool> compact: false;
-    callback clicked();
-
-    border-radius: 4px;
-    background: root.active ? #26304a : (ta.has-hover ? ShadTheme.accent : transparent);
-    border-width: root.active ? 1px : 0px;
-    border-color: ShadTheme.live-blue-bright;
-
-    HorizontalLayout {
-        alignment: center;
-        spacing: 4px;
-        padding-left: 4px;
-        padding-right: 4px;
-        VerticalLayout {
-            alignment: center;
-            LucideIcon { name: root.icon; icon-size: 12px; tint: root.active ? #b9c6ea : ShadTheme.fg-muted; }
-        }
-        if !root.compact || root.active : Text {
-            text: root.label;
-            font-size: 11px;
-            font-weight: root.active ? 600 : 500;
-            color: root.active ? #ffffff : ShadTheme.fg-muted;
-            vertical-alignment: center;
-        }
-    }
-
-    ta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
-component MenuActionRow inherits Rectangle {
-    in property <string> label;
-    in property <string> shortcut: "";
-    in property <string> icon: "";
-    callback triggered();
-
-    height: 26px;
-    border-radius: 4px;
-    background: ta.has-hover ? ShadTheme.accent : transparent;
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 8px;
-        if root.icon != "" : VerticalLayout {
-            alignment: center;
-            LucideIcon { name: root.icon; icon-size: 13px; tint: ShadTheme.fg-muted; }
-        }
-        Text {
-            horizontal-stretch: 1;
-            text: root.label;
-            font-size: 12px;
-            color: ShadTheme.fg;
-            vertical-alignment: center;
-        }
-        if root.shortcut != "" : Text {
-            text: root.shortcut;
-            font-size: 11px;
-            color: ShadTheme.fg-subtle;
-            vertical-alignment: center;
-        }
-    }
-
-    ta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.triggered(); }
-    }
 }
 
 export component MainWindow inherits Window {
@@ -633,7 +520,7 @@ export component MainWindow inherits Window {
                                 height: arq-vbox.preferred-height + 2px;
                                 Rectangle {
                                     width: 100%; height: 100%;
-                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                     arq-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
                                         MenuActionRow { label: "Importar Pasta de Letras (.txt)..."; icon: "folder"; triggered => { root.dialog-import-txt-folder(); } }
@@ -662,7 +549,7 @@ export component MainWindow inherits Window {
                                 height: novo-vbox.preferred-height + 2px;
                                 Rectangle {
                                     width: 100%; height: 100%;
-                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                     novo-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
                                         MenuActionRow { label: "Nova Música..."; icon: "music"; triggered => { root.editor-new-song(); root.active-modal = 2; } }
@@ -684,7 +571,7 @@ export component MainWindow inherits Window {
                                 height: ed-vbox.preferred-height + 2px;
                                 Rectangle {
                                     width: 100%; height: 100%;
-                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                     ed-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
                                         MenuActionRow {
@@ -760,7 +647,7 @@ export component MainWindow inherits Window {
                                 height: fer-vbox.preferred-height + 2px;
                                 Rectangle {
                                     width: 100%; height: 100%;
-                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                    background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                     fer-vbox := VerticalLayout {
                                         padding: 4px; spacing: 1px;
                                         MenuActionRow { label: "Contagem Regressiva..."; triggered => { root.preview-studio-countdown("10", "00", "", "Para iniciar o culto", 0, true, false); root.active-modal = 1; } }
@@ -1054,7 +941,7 @@ export component MainWindow inherits Window {
                                         height: scope-vbox.preferred-height + 2px;
                                         Rectangle {
                                             width: 100%; height: 100%;
-                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                             scope-vbox := VerticalLayout {
                                                 padding: 8px; spacing: 6px;
                                                 Text { text: "Buscar em"; font-size: 11px; font-weight: 600; color: ShadTheme.fg-muted; }
@@ -1107,13 +994,17 @@ export component MainWindow inherits Window {
                                 }
 
                                 for sr in root.songs-list : Rectangle {
-                                    height: 28px;
-                                    background: sr.song-id == root.selected-song-id ? ShadTheme.live-row-bg :
-                                                (srta.has-hover ? ShadTheme.muted-hover : transparent);
+                                    height: 30px;
 
-                                    if sr.song-id == root.selected-song-id : Rectangle {
-                                        x: 0px; y: 0px; width: 3px; height: 100%;
-                                        background: ShadTheme.live-blue-bright;
+                                    Rectangle {
+                                        x: 6px;
+                                        y: 1px;
+                                        width: parent.width - 12px;
+                                        height: parent.height - 2px;
+                                        border-radius: ShadTheme.radius-sm;
+                                        background: sr.song-id == root.selected-song-id ? ShadTheme.selected-tab-bg :
+                                                    (srta.has-hover ? ShadTheme.selected-row-bg : transparent);
+                                        animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
                                     }
 
                                     // Left clickable zone selects song on click, projects immediately on double-click
@@ -1130,23 +1021,23 @@ export component MainWindow inherits Window {
                                     HorizontalLayout {
                                         width: 100%;
                                         height: 100%;
-                                        padding-left: 8px;
+                                        padding-left: 14px;
                                         padding-right: 4px;
                                         spacing: 3px;
                                         Text {
                                             horizontal-stretch: 0;
                                             text: sr.title;
-                                            font-size: 11px;
+                                            font-size: 12px;
                                             font-weight: sr.song-id == root.selected-song-id ? 600 : 400;
-                                            color: sr.song-id == root.selected-song-id ? #ffffff : ShadTheme.fg;
+                                            color: sr.song-id == root.selected-song-id ? ShadTheme.on-accent : ShadTheme.fg;
                                             vertical-alignment: center;
                                             overflow: elide;
                                         }
                                         Text {
                                             horizontal-stretch: 1;
                                             text: sr.artist;
-                                            font-size: 11px;
-                                            color: ShadTheme.fg-muted;
+                                            font-size: 12px;
+                                            color: sr.song-id == root.selected-song-id ? ShadTheme.on-accent-dim : ShadTheme.fg-muted;
                                             vertical-alignment: center;
                                             overflow: elide;
                                         }
@@ -1328,7 +1219,7 @@ export component MainWindow inherits Window {
                                             height: lm-vbox.preferred-height + 2px;
                                             Rectangle {
                                                 width: 100%; height: 100%;
-                                                background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                                background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                                 lm-vbox := VerticalLayout {
                                                     padding: 4px; spacing: 1px;
                                                     MenuActionRow { label: "Nova música..."; icon: "music"; triggered => { root.editor-new-song(); root.active-modal = 2; } }
@@ -1395,7 +1286,7 @@ export component MainWindow inherits Window {
                                         height: rep-vbox.preferred-height + 2px;
                                         Rectangle {
                                             width: 100%; height: 100%;
-                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: ShadTheme.shadow-popover;
                                             rep-vbox := VerticalLayout {
                                                 padding: 4px; spacing: 1px;
                                                 MenuActionRow {
@@ -1563,22 +1454,17 @@ export component MainWindow inherits Window {
                             slides-vbox := VerticalLayout {
                                 alignment: start;
                                 width: parent.width;
-                                spacing: root.slides-grid-mode ? 6px : 0px;
-                                padding: root.slides-grid-mode ? 8px : 0px;
+                                spacing: root.slides-grid-mode ? 6px : 2px;
+                                padding: root.slides-grid-mode ? 8px : 6px;
 
                                 for sc in root.active-slides : Rectangle {
                                     min-height: max(28px, sl-row-layout.preferred-height);
-                                    border-radius: root.slides-grid-mode ? 5px : 0px;
-                                    border-width: root.slides-grid-mode ? 1px : 0px;
-                                    border-color: sc.slide-idx == root.current-slide-index ? ShadTheme.live-blue-bright : ShadTheme.border;
+                                    border-radius: ShadTheme.radius-sm;
+                                    border-width: root.slides-grid-mode && sc.slide-idx == root.current-slide-index ? 1px : 0px;
+                                    border-color: ShadTheme.live-blue-bright;
                                     background: sc.slide-idx == root.current-slide-index ? ShadTheme.live-row-bg :
                                                 (slta.has-hover ? ShadTheme.muted-hover : (root.slides-grid-mode ? ShadTheme.card : transparent));
-                                    animate background { duration: 80ms; }
-
-                                    if sc.slide-idx == root.current-slide-index && !root.slides-grid-mode : Rectangle {
-                                        x: 0px; y: 0px; width: 3px; height: 100%;
-                                        background: ShadTheme.live-blue-bright;
-                                    }
+                                    animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
 
                                     sl-row-layout := HorizontalLayout {
                                         width: 100%;
@@ -1603,14 +1489,14 @@ export component MainWindow inherits Window {
                                             text: sc.body;
                                             font-size: 12px;
                                             font-weight: sc.slide-idx == root.current-slide-index ? 600 : 400;
-                                            color: sc.slide-idx == root.current-slide-index ? #ffffff : ShadTheme.fg-secondary;
+                                            color: sc.slide-idx == root.current-slide-index ? ShadTheme.on-accent : ShadTheme.fg-secondary;
                                             vertical-alignment: center;
                                             wrap: word-wrap;
                                         }
 
                                         if sc.slide-idx < root.slide-marks.length && root.slide-marks[sc.slide-idx] : VerticalLayout {
                                             alignment: center;
-                                            LucideIcon { name: "heart-fill"; icon-size: 12px; tint: #f07c88; }
+                                            LucideIcon { name: "heart-fill"; icon-size: 12px; tint: ShadTheme.destructive; }
                                         }
 
                                         if sc.forced-break : VerticalLayout {
@@ -1620,7 +1506,7 @@ export component MainWindow inherits Window {
 
                                         if sc.slide-idx == root.current-slide-index : VerticalLayout {
                                             alignment: center;
-                                            LucideIcon { name: "check"; icon-size: 14px; tint: #ffffff; }
+                                            LucideIcon { name: "check"; icon-size: 14px; tint: ShadTheme.on-accent; }
                                         }
                                     }
 
@@ -1783,7 +1669,7 @@ export component MainWindow inherits Window {
                                 height: self.width * 9 / 16;
                                 x: (parent.width - self.width) / 2;
                                 y: 8px;
-                                background: #000000;
+                                background: ShadTheme.stage;
                                 border-radius: 4px;
                                 border-width: 1px;
                                 border-color: ShadTheme.border-strong;
@@ -1851,7 +1737,7 @@ export component MainWindow inherits Window {
                                         border-radius: 4px;
                                         border-width: 1px;
                                         border-color: ShadTheme.border-strong;
-                                        background: #000000;
+                                        background: ShadTheme.stage;
                                         clip: true;
                                         Image { width: 100%; height: 100%; image-fit: cover; source: root.active-theme-thumb; }
                                         TouchArea {
@@ -2050,7 +1936,7 @@ export component MainWindow inherits Window {
                                                 text: pl.title;
                                                 font-size: 11px;
                                                 font-weight: pl.row-idx == root.active-playlist-row ? 600 : 500;
-                                                color: pl.row-idx == root.active-playlist-row ? #ffffff : ShadTheme.fg;
+                                                color: pl.row-idx == root.active-playlist-row ? ShadTheme.on-accent : ShadTheme.fg;
                                                 horizontal-alignment: center;
                                                 overflow: elide;
                                             }
@@ -2117,7 +2003,7 @@ export component MainWindow inherits Window {
                                     border-width: th.theme-id == root.active-theme-id ? 2px : 1px;
                                     border-color: th.theme-id == root.active-theme-id ? ShadTheme.live-blue-bright :
                                                   (thta.has-hover ? ShadTheme.fg-muted : ShadTheme.border);
-                                    background: #000000;
+                                    background: ShadTheme.stage;
                                     clip: true;
 
                                     Image {
@@ -2136,7 +2022,7 @@ export component MainWindow inherits Window {
                                             x: 2px; width: parent.width - 4px; height: 100%;
                                             text: th.name;
                                             font-size: 11px;
-                                            color: #ffffff;
+                                            color: ShadTheme.on-accent;
                                             horizontal-alignment: center;
                                             vertical-alignment: center;
                                             overflow: elide;
@@ -2206,7 +2092,7 @@ export component MainWindow inherits Window {
                         horizontal-stretch: 1;
                         text: root.status-banner;
                         font-size: 11px;
-                        color: #b9c6ea;
+                        color: ShadTheme.live-blue-bright;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                         overflow: elide;

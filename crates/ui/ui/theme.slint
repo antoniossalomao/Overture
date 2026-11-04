@@ -1,4 +1,4 @@
-// Overture design tokens — tema escuro neutro (grafite), alinhado ao Orion (Grafite escuro)
+// Overture design tokens — escuro neutro estilo macOS (Sequoia): superfícies em camadas, azul de sistema, divisórias de 1px translúcidas
 import "../fonts/geist-sans-latin-400-normal.ttf";
 import "../fonts/geist-sans-latin-500-normal.ttf";
 import "../fonts/geist-sans-latin-600-normal.ttf";
@@ -10,59 +10,74 @@ export global UiFocus {
 }
 
 export global ShadTheme {
-    // Core Surfaces (Zinc 950 -> Zinc 800)
-    out property <color> bg: #151618;
-    out property <color> bg-bar: #111214;
-    out property <color> panel: #1b1c1f;
-    out property <color> card: #1b1c1f;
-    out property <color> popover: #1b1c1f;
-    out property <color> muted: #1e1f22;
-    out property <color> muted-hover: #222327;
-    out property <color> accent: #26272b;
-    out property <color> accent-hover: #2e2f34;
+    // Core Surfaces 
+    out property <color> bg: #1c1c1e;
+    out property <color> bg-bar: #171719;
+    out property <color> panel: #202022;
+    out property <color> card: #242426;
+    out property <color> popover: #2a2a2d;
+    out property <color> muted: #ffffff0d;
+    out property <color> muted-hover: #ffffff14;
+    out property <color> accent: #ffffff12;
+    out property <color> accent-hover: #ffffff1c;
 
     // Borders & Focus Rings
-    out property <color> border: #ffffff1c;
-    out property <color> border-subtle: #ffffff10;
-    out property <color> border-strong: #ffffff33;
-    out property <color> ring: #a4b3de;
+    out property <color> border: #ffffff14;
+    out property <color> border-subtle: #ffffff0b;
+    out property <color> border-strong: #ffffff22;
+    out property <color> ring: #0a84ff99;
 
     // Typography
-    out property <color> fg: #ececee;
-    out property <color> fg-secondary: #c9cacf;
-    out property <color> fg-muted: #a9aab0;
-    out property <color> fg-subtle: #8e8f96;
+    out property <color> fg: #f2f2f4;
+    out property <color> fg-secondary: #d2d2d6;
+    out property <color> fg-muted: #a4a4aa;
+    out property <color> fg-subtle: #7f7f86;
 
     // Brand / Primary (shadcn high-contrast + Holyrics Live Blue)
-    out property <color> primary: #b9c6ea;
-    out property <color> primary-hover: #c8d3f0;
-    out property <color> primary-fg: #0f1320;
+    out property <color> primary: #4a86e8;
+    out property <color> primary-hover: #5f96ee;
+    out property <color> primary-fg: #ffffff;
 
-    out property <color> live-blue: #a4b3de;
-    out property <color> live-blue-hover: #b4c2e6;
-    out property <color> live-blue-bright: #b9c6ea;
-    out property <color> live-row-bg: #272b3a;
-    out property <color> selected-row-bg: #26272b;
+    out property <color> live-blue: #4a86e8;
+    out property <color> live-blue-hover: #5f96ee;
+    out property <color> live-blue-bright: #8db4f5;
+    out property <color> live-row-bg: #4a86e824;
+    out property <color> selected-row-bg: #ffffff14;
 
     // Semantic Status
-    out property <color> emerald: #74cfae;
-    out property <color> emerald-bg: #17271f;
-    out property <color> emerald-border: #2f5a48;
+    out property <color> emerald: #34c759;
+    out property <color> emerald-bg: #32d74b22;
+    out property <color> emerald-border: #32d74b55;
 
-    out property <color> amber: #e9b467;
-    out property <color> amber-bg: #2a2116;
-    out property <color> amber-border: #6b4e1e;
+    out property <color> amber: #f0b050;
+    out property <color> amber-bg: #ffb34022;
+    out property <color> amber-border: #ffb34055;
 
-    out property <color> destructive: #f07c88;
-    out property <color> destructive-bg: #2e1a1d;
-    out property <color> destructive-hover: #4a2528;
-    out property <color> destructive-border: #6b2e35;
+    out property <color> destructive: #ff7a72;
+    out property <color> destructive-bg: #ff453a26;
+    out property <color> destructive-hover: #ff453a40;
+    out property <color> destructive-border: #ff453a55;
+
+    // Overlays, elevação e texto sobre superfícies saturadas
+    out property <color> on-accent: #ffffff;
+    out property <color> on-accent-dim: #ffffffcc;
+    out property <color> stage: #000000;
+    out property <color> scrim: #000000b8;
+    out property <color> shadow-popover: #000000bb;
+    out property <color> shadow-modal: #000000dd;
+    out property <color> selected-tab-bg: #ffffff1f;
+    out property <color> primary-pressed: #3b74d2;
+    out property <color> sky-pressed: #3b74d2;
+    out property <color> accent-pressed: #ffffff26;
+
+    // Movimento
+    out property <duration> motion-fast: 120ms;
 
     // Radii (shadcn/ui radius = 0.375rem / 6px)
-    out property <length> radius-xs: 4px;
+    out property <length> radius-xs: 5px;
     out property <length> radius-sm: 6px;
-    out property <length> radius-md: 8px;
-    out property <length> radius-lg: 12px;
+    out property <length> radius-md: 9px;
+    out property <length> radius-lg: 14px;
 
     // Holyrics 66-Book Canonical Palette (Modernized saturation)
     public pure function bible-book-bg(cat: int, active: bool, hovered: bool) -> color {

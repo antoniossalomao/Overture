@@ -1,0 +1,118 @@
+// Cromo da janela principal: gatilhos de menu, abas da biblioteca e linhas de ação.
+import { ShadTheme } from "theme.slint";
+import { LucideIcon } from "icons.slint";
+
+export component TopMenuTrigger inherits Rectangle {
+    in property <string> label;
+    callback clicked();
+
+    // Ocupa a altura inteira da barra (26px) para todos os itens ficarem na mesma linha de base,
+    // independente do container onde são colocados.
+    height: 26px;
+    width: txt.preferred-width + 16px;
+    background: transparent;
+
+    hover-bg := Rectangle {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        border-radius: 4px;
+        background: ta.has-hover ? ShadTheme.accent : transparent;
+        animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
+    }
+
+    txt := Text {
+        x: 8px;
+        width: parent.width - 16px;
+        height: parent.height;
+        text: root.label;
+        font-size: 12px;
+        color: ta.has-hover ? ShadTheme.fg : ShadTheme.fg-secondary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component LibTab inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> active: false;
+    // Coluna estreita: só a aba ativa mostra o texto
+    in property <bool> compact: false;
+    callback clicked();
+
+    border-radius: 4px;
+    background: root.active ? ShadTheme.selected-tab-bg : (ta.has-hover ? ShadTheme.accent : transparent);
+        animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 4px;
+        padding-left: 4px;
+        padding-right: 4px;
+        VerticalLayout {
+            alignment: center;
+            LucideIcon { name: root.icon; icon-size: 12px; tint: root.active ? ShadTheme.live-blue-bright : ShadTheme.fg-muted; }
+        }
+        if !root.compact || root.active : Text {
+            text: root.label;
+            font-size: 11px;
+            font-weight: root.active ? 600 : 500;
+            color: root.active ? ShadTheme.on-accent : ShadTheme.fg-muted;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component MenuActionRow inherits Rectangle {
+    in property <string> label;
+    in property <string> shortcut: "";
+    in property <string> icon: "";
+    callback triggered();
+
+    height: 26px;
+    border-radius: 4px;
+    background: ta.has-hover ? ShadTheme.accent : transparent;
+    animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        if root.icon != "" : VerticalLayout {
+            alignment: center;
+            LucideIcon { name: root.icon; icon-size: 13px; tint: ShadTheme.fg-muted; }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.label;
+            font-size: 12px;
+            color: ShadTheme.fg;
+            vertical-alignment: center;
+        }
+        if root.shortcut != "" : Text {
+            text: root.shortcut;
+            font-size: 11px;
+            color: ShadTheme.fg-subtle;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.triggered(); }
+    }
+}
