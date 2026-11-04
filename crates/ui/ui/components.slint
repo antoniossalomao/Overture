@@ -103,6 +103,7 @@ export component ShadIconButton inherits Rectangle {
     in property <bool> subtle: false;
     in property <length> box-size: 26px;
     in property <length> icon-px: 13px;
+    in property <string> tip: "";
     callback clicked();
 
     width: root.box-size;
@@ -129,6 +130,27 @@ export component ShadIconButton inherits Rectangle {
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
+    }
+
+    // Tooltip simples sob o ícone
+    if root.tip != "" && ta.has-hover : Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height + 4px;
+        width: tip-txt.preferred-width + 14px;
+        height: 22px;
+        background: ShadTheme.popover;
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: ShadTheme.border-strong;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: #000000aa;
+        tip-txt := Text {
+            text: root.tip;
+            font-size: 11px;
+            color: ShadTheme.fg;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
     }
 }
 

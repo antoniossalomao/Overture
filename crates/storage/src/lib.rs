@@ -471,6 +471,47 @@ impl Storage {
         }))
     }
 
+    /// Busca com escopo (título / artista / letra). Com todos os campos ligados é igual a
+    /// [`Self::search_songs`]. Sem a letra, busca candidatos no índice geral e filtra em
+    /// memória por título/artista (sem acento), então pode devolver menos que `limit`.
+    pub async fn search_songs_scoped(
+        &self,
+        query: &str,
+        include_archived: bool,
+        group_id: Option<i64>,
+        limit: i64,
+        in_title: bool,
+        in_artist: bool,
+        in_lyrics: bool,
+    ) -> Result<Vec<Song>> {
+        let folded = fold_search_text(query);
+        let tokens: Vec<String> = folded.split_whitespace().map(str::to_string).collect();
+        if tokens.is_empty() || in_lyrics {
+            return self.search_songs(query, include_archived, group_id, limit).await;
+        }
+        if !in_title && !in_artist {
+            return Ok(Vec::new());
+        }
+        let candidates = self
+            .search_songs(query, include_archived, group_id, (limit * 10).clamp(limit, 5_000))
+            .await?;
+        Ok(candidates
+            .into_iter()
+            .filter(|s| {
+                let mut hay = String::new();
+                if in_title {
+                    hay.push_str(&fold_search_text(&s.title));
+                    hay.push(' ');
+                }
+                if in_artist {
+                    hay.push_str(&fold_search_text(&s.artist));
+                }
+                tokens.iter().all(|t| hay.contains(t.as_str()))
+            })
+            .take(limit.max(0) as usize)
+            .collect())
+    }
+
     pub async fn search_songs(
         &self,
         query: &str,

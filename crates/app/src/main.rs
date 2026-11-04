@@ -2521,7 +2521,7 @@ fn stage_and_optionally_project_song(
     c.record_song_in_session_history(&song);
     refresh_session_history_ui(ui, c);
 
-    ui.set_active_slides(ModelRc::new(VecModel::from(slides_to_cards(&song.slides))));
+    set_slides_and_reset_marks(ui, slides_to_cards(&song.slides));
 
     if project_immediately {
         let theme = c.theme_for_song(song.id);
@@ -2769,10 +2769,15 @@ fn refresh_playlist_ui(ui: &MainWindow, c: &AppContext) {
 }
 
 fn refresh_songs_ui(ui: &MainWindow, c: &AppContext, query: &str, include_archived: bool) {
-    if let Ok(songs) = c
-        .rt
-        .block_on(c.storage.search_songs(query, include_archived, None, 500))
-    {
+    if let Ok(songs) = c.rt.block_on(c.storage.search_songs_scoped(
+        query,
+        include_archived,
+        None,
+        500,
+        ui.get_search_in_title(),
+        ui.get_search_in_artist(),
+        ui.get_search_in_lyrics(),
+    )) {
         let rows: Vec<UiSongRow> = songs.iter().map(song_to_ui_row).collect();
         ui.set_songs_list(ModelRc::new(VecModel::from(rows)));
     }
@@ -3197,7 +3202,7 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
                     forced_break: s.forced_break,
                 })
                 .collect();
-            ui.set_active_slides(ModelRc::new(VecModel::from(cards)));
+            set_slides_and_reset_marks(ui, cards);
             ui.set_current_slide_index(st.current_slide_index as i32);
         }
     } else if c.staged_song.is_none() {
@@ -3205,6 +3210,13 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
     }
 
     update_live_preview_and_telemetry(ui, c);
+}
+
+/// Troca os slides ativos e zera as marcas (um bool por slide).
+fn set_slides_and_reset_marks(ui: &MainWindow, cards: Vec<UiSlideCard>) {
+    let n = cards.len();
+    ui.set_slide_marks(ModelRc::new(VecModel::from(vec![false; n])));
+    ui.set_active_slides(ModelRc::new(VecModel::from(cards)));
 }
 
 fn update_live_preview_and_telemetry(ui: &MainWindow, c: &mut AppContext) {
