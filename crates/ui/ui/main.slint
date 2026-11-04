@@ -14,6 +14,7 @@ import {
     ShadColSplitter,
     ShadScrollArea
 } from "components.slint";
+import { OnboardingScreen } from "onboarding.slint";
 import {
     UiBibleBookTile,
     UiBibleBookGridRow,
@@ -126,6 +127,8 @@ component LibTab inherits Rectangle {
     in property <string> label;
     in property <string> icon;
     in property <bool> active: false;
+    // Coluna estreita: só a aba ativa mostra o texto
+    in property <bool> compact: false;
     callback clicked();
 
     border-radius: 4px;
@@ -142,7 +145,7 @@ component LibTab inherits Rectangle {
             alignment: center;
             LucideIcon { name: root.icon; icon-size: 12px; tint: root.active ? #b9c6ea : ShadTheme.fg-muted; }
         }
-        Text {
+        if !root.compact || root.active : Text {
             text: root.label;
             font-size: 11px;
             font-weight: root.active ? 600 : 500;
@@ -222,6 +225,30 @@ export component MainWindow inherits Window {
     // Active Modal: 0 = None, 1 = Countdown, 2 = SongEditor, 3 = ThemeStudio, 4 = DisplaySettings, 5 = Scoreboard/Alert, 6 = Schedule/Reports, 7 = Settings/Remote
     in-out property <int> active-modal: 0;
     in-out property <string> status-banner: "";
+    // Onboarding (primeira execução): -1 oculto, 0 boas-vindas, 1 baixando, 2 pronto, 3 erro
+    in-out property <int> onboarding-step: -1;
+    in-out property <float> onboarding-progress: 0;
+    in-out property <string> onboarding-message: "";
+    in-out property <string> onboarding-detail: "";
+    // Player (coluna da direita)
+    in-out property <string> player-title: "";
+    in-out property <float> player-pos: 0;
+    in-out property <float> player-dur: 0;
+    in-out property <bool> player-paused: false;
+    in-out property <bool> player-active: false;
+    in-out property <float> player-volume: 100;
+    callback player-toggle-pause();
+    callback player-stop();
+    callback player-seek(float);
+    callback player-volume-changed(float);
+    callback player-prev();
+    callback player-next();
+    pure function fmt-time(t: float) -> string {
+        return Math.floor(t / 60) + ":" + (Math.mod(t, 60) < 10 ? "0" : "") + Math.floor(Math.mod(t, 60));
+    }
+    callback onboarding-start();
+    callback onboarding-skip();
+    callback onboarding-finish();
 
     // Top Header & Active Item
     in-out property <string> active-header-title: "Selecione uma música ou versículo";
@@ -232,12 +259,21 @@ export component MainWindow inherits Window {
     in-out property <bool> is-clear-text: false;
     in-out property <bool> auto-play-enabled: false;
     in-out property <bool> auto-play-repeat: true;
+    // Tom e BPM da música ativa (vazios = só o título). Ainda sem fonte nos metadados.
+    in-out property <string> active-key: "";
+    // Slides marcados (um bool por slide; o app zera ao trocar de música)
+    in-out property <[bool]> slide-marks: [];
+    in-out property <string> active-bpm: "";
 
     // Column 1: Library
     in-out property <int> left-lib-tab: 0; // 0 Letras, 1 Texto, 2 Áudio, 3 Vídeo, 4 Imagem
     in-out property <string> library-search-query: "";
     property <int> search-focus-seq: 0;
     in-out property <bool> show-archived: false;
+    // Escopo da busca na biblioteca
+    in-out property <bool> search-in-title: true;
+    in-out property <bool> search-in-artist: true;
+    in-out property <bool> search-in-lyrics: true;
     in-out property <[UiSongRow]> songs-list: [];
     in-out property <int> selected-song-id: 0;
     in-out property <[UiMediaRow]> media-list: [];
@@ -275,6 +311,8 @@ export component MainWindow inherits Window {
 
     // Column 5: Far-Right Vertical Theme Thumbnail Strip
     in-out property <bool> show-theme-strip: true;
+    // A faixa de temas recolhe sozinha em janelas estreitas (< 1366 px).
+    property <bool> theme-strip-visible: root.show-theme-strip && root.win-w >= 1366px;
     in-out property <int> theme-strip-filter: 0; // 0 Todos, 1 Retorno
     in-out property <[UiThemeRow]> themes-list: [];
 
@@ -365,9 +403,20 @@ export component MainWindow inherits Window {
     in-out property <string> shortcut-logo: "L";
 
     // Resizable column widths (tuned to Holyrics proportions so 1024px+ fits all 5 columns cleanly)
-    property <length> col1-width: 250px;
-    property <length> col2-width: 300px;
-    property <length> col4-width: 200px;
+    // Proporções próximas ao Holyrics: biblioteca larga (abas inteiras), lista de slides no meio, prévia ao centro.
+    // Proporções do Holyrics 2.30 (318/671/549/255/95 px em 1917 px): biblioteca 17 %,
+    // slides 35 %, prévia 29 % (o resto), playlist 13 %, temas 5 %. -1px = automático
+    // (proporcional à janela); o arraste dos divisores grava um valor fixo.
+    // Cópia da largura da janela (evita laço de binding: root.width depende do layout).
+    property <length> win-w: 1200px;
+    changed width => { self.win-w = self.width; }
+    property <length> col1-user: -1px;
+    property <length> col2-user: -1px;
+    property <length> col4-user: -1px;
+    property <length> col1-width: root.col1-user >= 0px ? root.col1-user : clamp(root.win-w * 0.166, 165px, 420px);
+    property <length> col2-width: root.col2-user >= 0px ? root.col2-user : clamp(root.win-w * 0.35, 215px, 700px);
+    property <length> col4-width: root.col4-user >= 0px ? root.col4-user : clamp(root.win-w * 0.133, 145px, 360px);
+    property <length> theme-strip-width: clamp(root.win-w * 0.05, 64px, 95px);
 
     // ==================== CALLBACKS ====================
     callback key-shortcut(string);
@@ -812,18 +861,10 @@ export component MainWindow inherits Window {
                     padding-right: 8px;
                     spacing: 8px;
 
-                    // Left: Stage Alert quick icon + "Ir para Bíblia" button
-                    HorizontalLayout {
+                    // Esquerda: "Ir para Bíblia" (ícone de livro)
+                    left-grp := HorizontalLayout {
                         spacing: 5px;
                         alignment: start;
-                        VerticalLayout {
-                            alignment: center;
-                            ShadIconButton {
-                                icon: "message";
-                                box-size: 26px;
-                                clicked => { root.active-modal = 5; }
-                            }
-                        }
                         VerticalLayout {
                             alignment: center;
                             ShadButton {
@@ -836,26 +877,20 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    // Center: Active Song / Item Title (Emaús + Consagração (IBAB))
-                    HorizontalLayout {
-                        horizontal-stretch: 1;
-                        spacing: 6px;
-                        alignment: center;
-                        Text {
-                            text: root.active-header-title + (root.active-header-subtitle != "" ? "  (" + root.active-header-subtitle + ")" : "");
-                            font-size: 14px;
-                            font-weight: 600;
-                            color: ShadTheme.fg;
-                            vertical-alignment: center;
-                            horizontal-alignment: center;
-                            overflow: elide;
-                        }
-                    }
+                    Rectangle { horizontal-stretch: 1; }
 
-                    // Right: Playlist Mode (Temporário / Culto) + Temas Toggle
-                    HorizontalLayout {
+                    // Direita: grupo de alertas (mensagens) + Temporário/Culto com seta + Temas
+                    right-grp := HorizontalLayout {
                         spacing: 6px;
                         alignment: end;
+                        VerticalLayout {
+                            alignment: center;
+                            ShadIconButton {
+                                icon: "message";
+                                box-size: 26px;
+                                clicked => { root.active-modal = 5; }
+                            }
+                        }
                         VerticalLayout {
                             alignment: center;
                             ShadButton {
@@ -879,6 +914,21 @@ export component MainWindow inherits Window {
                             }
                         }
                     }
+                }
+
+                // Título centralizado na janela; nunca passa por baixo dos botões
+                Text {
+                    property <length> side: max(left-grp.preferred-width, right-grp.preferred-width) + 16px;
+                    x: self.side;
+                    width: max(0px, parent.width - 2 * self.side);
+                    height: parent.height;
+                    text: root.active-header-title + (root.active-header-subtitle != "" ? "  (" + root.active-header-subtitle + ")" : "");
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: ShadTheme.fg;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                    overflow: elide;
                 }
 
                 Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
@@ -947,25 +997,26 @@ export component MainWindow inherits Window {
                                 HorizontalLayout {
                                     horizontal-stretch: 1;
                                     spacing: 2px;
-                                    LibTab { horizontal-stretch: 1; label: "Letras"; icon: "music"; active: root.left-lib-tab == 0; clicked => { root.left-lib-tab = 0; } }
-                                    LibTab { horizontal-stretch: 1; label: "Texto"; icon: "edit"; active: root.left-lib-tab == 1; clicked => { root.left-lib-tab = 1; } }
-                                    LibTab { horizontal-stretch: 1; label: "Áudio"; icon: "monitor"; active: root.left-lib-tab == 2; clicked => { root.left-lib-tab = 2; } }
-                                    LibTab { horizontal-stretch: 1; label: "Vídeo"; icon: "play"; active: root.left-lib-tab == 3; clicked => { root.left-lib-tab = 3; } }
-                                    LibTab { horizontal-stretch: 1; label: "Img"; icon: "grid"; active: root.left-lib-tab == 4; clicked => { root.left-lib-tab = 4; } }
+                                    LibTab { horizontal-stretch: 1; compact: root.col1-width < 300px; label: "Letras"; icon: "music"; active: root.left-lib-tab == 0; clicked => { root.left-lib-tab = 0; } }
+                                    LibTab { horizontal-stretch: 1; compact: root.col1-width < 300px; label: "Texto"; icon: "edit"; active: root.left-lib-tab == 1; clicked => { root.left-lib-tab = 1; } }
+                                    LibTab { horizontal-stretch: 1; compact: root.col1-width < 300px; label: "Áudio"; icon: "monitor"; active: root.left-lib-tab == 2; clicked => { root.left-lib-tab = 2; } }
+                                    LibTab { horizontal-stretch: 1; compact: root.col1-width < 300px; label: "Vídeo"; icon: "play"; active: root.left-lib-tab == 3; clicked => { root.left-lib-tab = 3; } }
+                                    LibTab { horizontal-stretch: 1; compact: root.col1-width < 300px; label: "Img"; icon: "grid"; active: root.left-lib-tab == 4; clicked => { root.left-lib-tab = 4; } }
                                 }
                                 ShadIconButton {
-                                    icon: "plus";
+                                    icon: "chart";
+                                    tip: "Informações da biblioteca";
                                     box-size: 26px;
+                                    clicked => { root.status-banner = root.songs-list.length + " itens na lista atual" + (root.show-archived ? " (com arquivados)" : ""); }
+                                }
+                                ShadIconButton {
+                                    icon: "folder";
+                                    tip: "Arquivados";
+                                    box-size: 26px;
+                                    active: root.show-archived;
                                     clicked => {
-                                        if (root.left-lib-tab == 0) {
-                                            root.editor-new-song();
-                                            root.active-modal = 2;
-                                        } else if (root.left-lib-tab == 1) {
-                                            root.quick-text-title = "Aviso";
-                                            root.quick-text-body = "";
-                                        } else {
-                                            root.pick-and-add-media();
-                                        }
+                                        root.show-archived = !root.show-archived;
+                                        root.toggle-show-archived(root.show-archived);
                                     }
                                 }
                             }
@@ -987,6 +1038,39 @@ export component MainWindow inherits Window {
                                     text <=> root.library-search-query;
                                     edited(q) => { root.search-songs(q); }
                                     accepted(q) => { root.search-songs-accepted(q); }
+                                }
+                                Rectangle {
+                                    width: 24px;
+                                    ShadIconButton {
+                                        icon: "chevron-down";
+                                        tip: "Onde buscar";
+                                        box-size: 26px;
+                                        y: (parent.height - self.height) / 2;
+                                        clicked => { pop-scope.show(); }
+                                    }
+                                    pop-scope := PopupWindow {
+                                        x: -150px; y: parent.height;
+                                        width: 190px;
+                                        height: scope-vbox.preferred-height + 2px;
+                                        Rectangle {
+                                            width: 100%; height: 100%;
+                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                            scope-vbox := VerticalLayout {
+                                                padding: 8px; spacing: 6px;
+                                                Text { text: "Buscar em"; font-size: 11px; font-weight: 600; color: ShadTheme.fg-muted; }
+                                                ShadCheckbox { label: "Título"; checked <=> root.search-in-title; toggled(v) => { root.search-songs(root.library-search-query); } }
+                                                ShadCheckbox { label: "Artista"; checked <=> root.search-in-artist; toggled(v) => { root.search-songs(root.library-search-query); } }
+                                                ShadCheckbox { label: "Letra"; checked <=> root.search-in-lyrics; toggled(v) => { root.search-songs(root.library-search-query); } }
+                                            }
+                                        }
+                                    }
+                                }
+                                ShadIconButton {
+                                    icon: "plus";
+                                    tip: "Nova música";
+                                    box-size: 26px;
+                                    y: (parent.height - self.height) / 2;
+                                    clicked => { root.editor-new-song(); root.active-modal = 2; }
                                 }
                             }
                             Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border-subtle; }
@@ -1050,11 +1134,19 @@ export component MainWindow inherits Window {
                                         padding-right: 4px;
                                         spacing: 3px;
                                         Text {
-                                            horizontal-stretch: 1;
-                                            text: sr.title + (sr.artist != "" ? " (" + sr.artist + ")" : "");
+                                            horizontal-stretch: 0;
+                                            text: sr.title;
                                             font-size: 11px;
                                             font-weight: sr.song-id == root.selected-song-id ? 600 : 400;
-                                            color: sr.song-id == root.selected-song-id ? #ffffff : ShadTheme.fg-secondary;
+                                            color: sr.song-id == root.selected-song-id ? #ffffff : ShadTheme.fg;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+                                        Text {
+                                            horizontal-stretch: 1;
+                                            text: sr.artist;
+                                            font-size: 11px;
+                                            color: ShadTheme.fg-muted;
                                             vertical-alignment: center;
                                             overflow: elide;
                                         }
@@ -1193,11 +1285,58 @@ export component MainWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 HorizontalLayout {
-                                    spacing: 6px;
+                                    spacing: 4px;
                                     ShadCheckbox {
                                         label: "Arquivados";
                                         checked <=> root.show-archived;
                                         toggled(v) => { root.toggle-show-archived(v); }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        ShadIconButton {
+                                            icon: "check";
+                                            tip: "Projetar selecionada";
+                                            box-size: 20px;
+                                            icon-px: 11px;
+                                            clicked => { if (root.selected-song-id > 0) { root.song-project-now(root.selected-song-id); } }
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        ShadIconButton {
+                                            icon: "list";
+                                            tip: "Adicionar ao culto";
+                                            box-size: 20px;
+                                            icon-px: 11px;
+                                            clicked => { if (root.selected-song-id > 0) { root.song-add-to-service(root.selected-song-id); } }
+                                        }
+                                    }
+                                    Rectangle {
+                                        width: 20px;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            ShadIconButton {
+                                                icon: "settings";
+                                                tip: "Mais ações";
+                                                box-size: 20px;
+                                                icon-px: 11px;
+                                                clicked => { pop-libmenu.show(); }
+                                            }
+                                        }
+                                        pop-libmenu := PopupWindow {
+                                            x: -170px; y: -88px; width: 200px;
+                                            height: lm-vbox.preferred-height + 2px;
+                                            Rectangle {
+                                                width: 100%; height: 100%;
+                                                background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                                lm-vbox := VerticalLayout {
+                                                    padding: 4px; spacing: 1px;
+                                                    MenuActionRow { label: "Nova música..."; icon: "music"; triggered => { root.editor-new-song(); root.active-modal = 2; } }
+                                                    MenuActionRow { label: "Importar pasta de letras..."; icon: "folder"; triggered => { root.dialog-import-txt-folder(); } }
+                                                    MenuActionRow { label: "Adicionar mídia..."; icon: "plus"; triggered => { root.pick-and-add-media(); } }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1206,7 +1345,7 @@ export component MainWindow inherits Window {
                 }
 
                 ShadColSplitter {
-                    dragged(dx) => { root.col1-width = clamp(root.col1-width + dx, 165px, 420px); }
+                    dragged(dx) => { root.col1-user = clamp(root.col1-width + dx, 165px, 420px); }
                 }
 
                 // ---------- COLUMN 2: CENTER-LEFT ACTIVE SONG SLIDES ----------
@@ -1228,46 +1367,65 @@ export component MainWindow inherits Window {
                                 alignment: center;
 
                                 ShadIconButton {
-                                    icon: "skip-prev";
+                                    icon: "skip-prev"; tip: "Slide anterior";
                                     box-size: 24px;
                                     clicked => { root.prev-slide(); }
                                 }
                                 ShadIconButton {
-                                    icon: "play";
+                                    icon: "play"; tip: "Primeiro slide";
                                     box-size: 24px;
                                     clicked => { root.goto-slide(0); }
                                 }
                                 ShadIconButton {
-                                    icon: "skip-next";
+                                    icon: "skip-next"; tip: "Próximo slide";
                                     box-size: 24px;
                                     clicked => { root.next-slide(); }
                                 }
-                                ShadIconButton {
-                                    icon: "repeat";
-                                    box-size: 24px;
-                                    active: root.auto-play-enabled;
-                                    clicked => {
-                                        root.auto-play-enabled = !root.auto-play-enabled;
-                                        root.toggle-auto-play(root.auto-play-enabled);
+                                Rectangle {
+                                    width: 24px;
+                                    height: 24px;
+                                    ShadIconButton {
+                                        icon: "repeat"; tip: "Avanço automático / repetir";
+                                        box-size: 24px;
+                                        active: root.auto-play-enabled;
+                                        clicked => { pop-repeat.show(); }
                                     }
-                                }
-                                ShadButton {
-                                    size: "xs";
-                                    label: root.auto-play-repeat ? "Repetir" : "Parar no fim";
-                                    variant: "secondary";
-                                    clicked => {
-                                        root.auto-play-repeat = !root.auto-play-repeat;
-                                        root.toggle-auto-play-repeat(root.auto-play-repeat);
+                                    pop-repeat := PopupWindow {
+                                        x: 0px; y: 26px; width: 200px;
+                                        height: rep-vbox.preferred-height + 2px;
+                                        Rectangle {
+                                            width: 100%; height: 100%;
+                                            background: ShadTheme.popover; border-radius: 6px; border-width: 1px; border-color: ShadTheme.border-strong; drop-shadow-blur: 16px; drop-shadow-color: #000000bb;
+                                            rep-vbox := VerticalLayout {
+                                                padding: 4px; spacing: 1px;
+                                                MenuActionRow {
+                                                    label: root.auto-play-enabled ? "Parar avanço automático" : "Avanço automático";
+                                                    icon: "play";
+                                                    triggered => {
+                                                        root.auto-play-enabled = !root.auto-play-enabled;
+                                                        root.toggle-auto-play(root.auto-play-enabled);
+                                                    }
+                                                }
+                                                MenuActionRow {
+                                                    label: root.auto-play-repeat ? "Parar no fim" : "Repetir";
+                                                    icon: "repeat";
+                                                    triggered => {
+                                                        root.auto-play-repeat = !root.auto-play-repeat;
+                                                        root.toggle-auto-play-repeat(root.auto-play-repeat);
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 Rectangle { width: 1px; height: 14px; y: 10px; background: ShadTheme.border; }
                                 ShadIconButton {
-                                    icon: "palette";
+                                    icon: "palette"; tip: "Editar tema";
                                     box-size: 24px;
                                     clicked => { root.open-theme-editor(root.active-theme-id); root.active-modal = 3; }
                                 }
                                 ShadIconButton {
-                                    icon: "edit";
+                                    icon: "edit"; tip: "Editar música";
                                     box-size: 24px;
                                     clicked => {
                                         if (root.selected-song-id > 0) {
@@ -1279,13 +1437,23 @@ export component MainWindow inherits Window {
                                     }
                                 }
                                 ShadIconButton {
-                                    icon: root.slides-grid-mode ? "list" : "grid";
+                                    icon: root.slides-grid-mode ? "list" : "grid"; tip: "Alternar lista/grade";
                                     box-size: 24px;
                                     active: root.slides-grid-mode;
                                     clicked => { root.slides-grid-mode = !root.slides-grid-mode; }
                                 }
                                 ShadIconButton {
-                                    icon: "plus";
+                                    icon: "heart";
+                                    tip: "Marcar slide";
+                                    box-size: 24px;
+                                    clicked => {
+                                        if (root.current-slide-index >= 0 && root.current-slide-index < root.slide-marks.length) {
+                                            root.slide-marks[root.current-slide-index] = !root.slide-marks[root.current-slide-index];
+                                        }
+                                    }
+                                }
+                                ShadIconButton {
+                                    icon: "plus"; tip: "Adicionar ao culto";
                                     box-size: 24px;
                                     clicked => {
                                         if (root.selected-song-id > 0) {
@@ -1294,7 +1462,12 @@ export component MainWindow inherits Window {
                                     }
                                 }
                                 ShadIconButton {
-                                    icon: "trash";
+                                    icon: "music"; tip: "Mostrar letras";
+                                    box-size: 24px;
+                                    clicked => { root.left-lib-tab = 0; }
+                                }
+                                ShadIconButton {
+                                    icon: "trash"; tip: "Arquivar música";
                                     box-size: 24px;
                                     danger: true;
                                     clicked => {
@@ -1305,6 +1478,21 @@ export component MainWindow inherits Window {
                                         }
                                     }
                                 }
+                            }
+                            Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                        }
+
+                        // Linha de tom e BPM ("Fm | BPM: 87"); some quando não há metadados
+                        if root.active-key != "" || root.active-bpm != "" : Rectangle {
+                            height: 24px;
+                            background: ShadTheme.bg;
+                            Text {
+                                x: 10px; width: parent.width - 20px; height: 100%;
+                                text: root.active-key + (root.active-key != "" && root.active-bpm != "" ? "  |  " : "") + (root.active-bpm != "" ? "BPM: " + root.active-bpm : "");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: ShadTheme.fg-muted;
+                                vertical-alignment: center;
                             }
                             Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
                         }
@@ -1373,12 +1561,13 @@ export component MainWindow inherits Window {
                             content-height: slides-vbox.preferred-height + 12px;
 
                             slides-vbox := VerticalLayout {
+                                alignment: start;
                                 width: parent.width;
                                 spacing: root.slides-grid-mode ? 6px : 0px;
                                 padding: root.slides-grid-mode ? 8px : 0px;
 
                                 for sc in root.active-slides : Rectangle {
-                                    min-height: max(40px, sl-row-layout.preferred-height);
+                                    min-height: max(28px, sl-row-layout.preferred-height);
                                     border-radius: root.slides-grid-mode ? 5px : 0px;
                                     border-width: root.slides-grid-mode ? 1px : 0px;
                                     border-color: sc.slide-idx == root.current-slide-index ? ShadTheme.live-blue-bright : ShadTheme.border;
@@ -1395,9 +1584,19 @@ export component MainWindow inherits Window {
                                         width: 100%;
                                         padding-left: 10px;
                                         padding-right: 8px;
-                                        padding-top: 7px;
-                                        padding-bottom: 7px;
+                                        padding-top: 3px;
+                                        padding-bottom: 3px;
                                         spacing: 8px;
+
+                                        Text {
+                                            width: 16px;
+                                            text: sc.number-label;
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: sc.slide-idx == root.current-slide-index ? #ffffffcc : ShadTheme.fg-muted;
+                                            vertical-alignment: top;
+                                            horizontal-alignment: right;
+                                        }
 
                                         Text {
                                             horizontal-stretch: 1;
@@ -1409,9 +1608,19 @@ export component MainWindow inherits Window {
                                             wrap: word-wrap;
                                         }
 
+                                        if sc.slide-idx < root.slide-marks.length && root.slide-marks[sc.slide-idx] : VerticalLayout {
+                                            alignment: center;
+                                            LucideIcon { name: "heart-fill"; icon-size: 12px; tint: #f07c88; }
+                                        }
+
                                         if sc.forced-break : VerticalLayout {
                                             alignment: center;
                                             ShadBadge { text: "revisar"; variant: "amber"; }
+                                        }
+
+                                        if sc.slide-idx == root.current-slide-index : VerticalLayout {
+                                            alignment: center;
+                                            LucideIcon { name: "check"; icon-size: 14px; tint: #ffffff; }
                                         }
                                     }
 
@@ -1433,7 +1642,7 @@ export component MainWindow inherits Window {
                 }
 
                 ShadColSplitter {
-                    dragged(dx) => { root.col2-width = clamp(root.col2-width + dx, 215px, 540px); }
+                    dragged(dx) => { root.col2-user = clamp(root.col2-width + dx, 215px, 700px); }
                 }
 
                 // ---------- COLUMN 3: CENTER LIVE MONITOR PREVIEW ----------
@@ -1443,6 +1652,91 @@ export component MainWindow inherits Window {
 
                     VerticalLayout {
                         spacing: 0px;
+
+                        // Painel Player: faixa atual, tempo, transporte, volume e saída
+                        Rectangle {
+                            height: 74px;
+                            background: ShadTheme.panel;
+                            VerticalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                padding-top: 6px;
+                                padding-bottom: 6px;
+                                spacing: 5px;
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    LucideIcon { name: "music"; icon-size: 12px; tint: root.player-active ? ShadTheme.live-blue-bright : ShadTheme.fg-muted; }
+                                    Text {
+                                        horizontal-stretch: 1;
+                                        text: root.player-active ? root.player-title : "Player — nenhuma faixa";
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        color: root.player-active ? ShadTheme.fg : ShadTheme.fg-muted;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.fmt-time(root.player-pos) + " / " + root.fmt-time(root.player-dur);
+                                        font-size: 11px;
+                                        color: ShadTheme.fg-muted;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                // Barra de progresso (clique para buscar)
+                                Rectangle {
+                                    height: 8px;
+                                    border-radius: 4px;
+                                    background: ShadTheme.muted;
+                                    clip: true;
+                                    Rectangle {
+                                        x: 0px;
+                                        width: root.player-dur > 0 ? parent.width * clamp(root.player-pos / root.player-dur, 0, 1) : 0px;
+                                        background: ShadTheme.live-blue-bright;
+                                    }
+                                    TouchArea {
+                                        enabled: root.player-active && root.player-dur > 0;
+                                        mouse-cursor: pointer;
+                                        clicked => { root.player-seek(self.mouse-x / self.width * root.player-dur); }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 3px;
+                                    ShadIconButton { icon: "skip-prev"; box-size: 24px; clicked => { root.player-prev(); } }
+                                    ShadIconButton { icon: root.player-paused || !root.player-active ? "play" : "pause"; box-size: 24px; active: root.player-active && !root.player-paused; clicked => { root.player-toggle-pause(); } }
+                                    ShadIconButton { icon: "skip-next"; box-size: 24px; clicked => { root.player-next(); } }
+                                    ShadIconButton { icon: "stop"; box-size: 24px; clicked => { root.player-stop(); } }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        LucideIcon { name: "monitor"; icon-size: 13px; tint: ShadTheme.fg-muted; }
+                                    }
+                                    // Volume (clique para ajustar)
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 70px;
+                                            height: 6px;
+                                            border-radius: 3px;
+                                            background: ShadTheme.muted;
+                                            clip: true;
+                                            Rectangle {
+                                                x: 0px;
+                                                width: parent.width * clamp(root.player-volume / 100, 0, 1);
+                                                background: ShadTheme.fg-secondary;
+                                            }
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.player-volume-changed(self.mouse-x / self.width * 100); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle { y: parent.height - 1px; height: 1px; background: ShadTheme.border; }
+                        }
 
                         // Top Engine / Role Header (like Holyrics "VLC Player" bar, upgraded!)
                         Rectangle {
@@ -1488,7 +1782,7 @@ export component MainWindow inherits Window {
                                 width: min(self.max-w, self.max-h * 16 / 9);
                                 height: self.width * 9 / 16;
                                 x: (parent.width - self.width) / 2;
-                                y: (parent.height - self.height) / 2;
+                                y: 8px;
                                 background: #000000;
                                 border-radius: 4px;
                                 border-width: 1px;
@@ -1583,7 +1877,7 @@ export component MainWindow inherits Window {
                 }
 
                 ShadColSplitter {
-                    dragged(dx) => { root.col4-width = clamp(root.col4-width - dx, 145px, 360px); }
+                    dragged(dx) => { root.col4-user = clamp(root.col4-width - dx, 145px, 360px); }
                 }
 
                 // ---------- COLUMN 4: MÍDIA / ANOTAÇÕES + ORDEM DO CULTO ----------
@@ -1795,13 +2089,13 @@ export component MainWindow inherits Window {
                 }
 
                 // ---------- COLUMN 5: FAR-RIGHT VERTICAL THEME THUMBNAIL STRIP (Screenshot 1!) ----------
-                if root.show-theme-strip : Rectangle {
+                if root.theme-strip-visible : Rectangle {
                     width: 1px;
                     background: ShadTheme.border;
                 }
 
-                if root.show-theme-strip : Rectangle {
-                    width: 78px;
+                if root.theme-strip-visible : Rectangle {
+                    width: root.theme-strip-width;
                     background: ShadTheme.bg-bar;
 
                     VerticalLayout {
@@ -2035,5 +2329,15 @@ export component MainWindow inherits Window {
             trigger-export-txt-dialog => { root.dialog-export-txt(); }
             trigger-export-json-dialog => { root.dialog-export-json(); }
         }
+    }
+
+    if root.onboarding-step >= 0 : OnboardingScreen {
+        step: root.onboarding-step;
+        progress: root.onboarding-progress;
+        message: root.onboarding-message;
+        detail: root.onboarding-detail;
+        start => { root.onboarding-start(); }
+        skip => { root.onboarding-skip(); }
+        finish => { root.onboarding-finish(); }
     }
 }

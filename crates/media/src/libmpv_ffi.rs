@@ -183,6 +183,24 @@ impl LibMpvPlayer {
         }
     }
 
+    pub fn position_secs(&self) -> Option<f64> {
+        let name = CString::new("time-pos").ok()?;
+        unsafe {
+            let raw = (self.fn_get_prop)(self.handle, name.as_ptr());
+            if raw.is_null() {
+                return None;
+            }
+            let val = CStr::from_ptr(raw).to_string_lossy().parse::<f64>().ok();
+            (self.fn_free)(raw as *mut c_void);
+            val
+        }
+    }
+
+    /// Posição absoluta em segundos.
+    pub fn seek_secs(&mut self, secs: f64) {
+        self.set_property("time-pos", &format!("{:.3}", secs.max(0.0)));
+    }
+
     pub fn render_rgba(&mut self, width: u32, height: u32, out_rgba: &mut [u8]) -> Result<()> {
         let expected = (width as usize) * (height as usize) * 4;
         if out_rgba.len() < expected {

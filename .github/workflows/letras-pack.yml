@@ -1,0 +1,43 @@
+name: Pacote de letras
+
+# Baixa o corpus damarals/letras, organiza (sem duplicatas, pastas por inicial do artista) e publica
+# `overture-letras.zip` na release fixa `letras-latest`, que o app baixa na primeira execução
+# (crates/app/src/onboarding.rs). Rode manualmente (Actions > Pacote de letras > Run workflow).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 1 * *" # todo dia 1, 05:17 UTC
+
+permissions:
+  contents: write
+
+jobs:
+  pacote:
+    name: Gerar e publicar overture-letras.zip
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Baixar corpus (damarals/letras)
+        run: curl -fsSL -o letras-txt.zip https://github.com/damarals/letras/releases/latest/download/letras-txt.zip
+
+      - name: Gerar pacote
+        run: |
+          cargo run --release -p overture-import --example build_letras_pack -- letras-txt.zip overture-letras.zip
+          ls -lh overture-letras.zip
+
+      - name: Publicar na release letras-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view letras-latest >/dev/null 2>&1; then
+            gh release create letras-latest --title "Pacote de letras" \
+              --notes "Coletânea de letras gospel (fonte: github.com/damarals/letras, MIT) organizada para o Overture. Baixada automaticamente na primeira execução do app. Os direitos das letras pertencem aos respectivos autores."
+          fi
+          gh release upload letras-latest overture-letras.zip --clobber

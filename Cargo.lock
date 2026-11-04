@@ -4073,6 +4073,7 @@ dependencies = [
  "overture-render",
  "overture-storage",
  "overture-ui",
+ "reqwest",
  "rfd",
  "serde_json",
  "slint",

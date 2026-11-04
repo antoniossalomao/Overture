@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod onboarding;
+
 use anyhow::Result;
 use chrono::Timelike;
 use directories::ProjectDirs;
@@ -211,6 +213,11 @@ fn main() -> Result<()> {
     rt.block_on(seed_initial_demo_data_if_empty(&storage))?;
 
     let settings = rt.block_on(storage.load_settings()).unwrap_or_default();
+    let onboarding_done = settings.onboarding_done;
+    let onboarding_dir = db_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(std::env::temp_dir);
     let locale = Locale::from_code(&settings.locale);
     let i18n = I18n::new(locale);
 
@@ -412,6 +419,72 @@ fn main() -> Result<()> {
             }
         });
     }
+
+    // Painel Player (coluna da direita): transporte, busca, volume e faixa anterior/próxima
+    {
+        let ctx = ctx.clone();
+        ui.on_player_toggle_pause(move || {
+            let c = ctx.borrow();
+            let ms = c.media_engine.subscribe_status().borrow().clone();
+            if !ms.path.is_empty() {
+                c.media_engine.send(MediaCommand::SetPaused(!ms.paused));
+            }
+        });
+    }
+    {
+        let ctx = ctx.clone();
+        ui.on_player_stop(move || {
+            ctx.borrow().media_engine.send(MediaCommand::Stop);
+        });
+    }
+    {
+        let ctx = ctx.clone();
+        ui.on_player_seek(move |secs| {
+            ctx.borrow().media_engine.send(MediaCommand::Seek(secs.max(0.0) as f64));
+        });
+    }
+    {
+        let ctx = ctx.clone();
+        ui.on_player_volume_changed(move |v| {
+            ctx.borrow().media_engine.send(MediaCommand::SetVolume(v.clamp(0.0, 100.0) as u8));
+        });
+    }
+    for dir in [-1i32, 1] {
+        let ctx = ctx.clone();
+        let step = move || {
+            let c = ctx.borrow();
+            let Ok(list) = c.rt.block_on(c.storage.list_media(false)) else { return };
+            let audios: Vec<_> = list.into_iter().filter(|m| m.kind == MediaKind::Audio).collect();
+            if audios.is_empty() {
+                return;
+            }
+            let cur = c.media_engine.subscribe_status().borrow().path.clone();
+            let idx = audios.iter().position(|m| m.path == cur);
+            let next = match idx {
+                Some(i) => (i as i32 + dir).rem_euclid(audios.len() as i32) as usize,
+                None => 0,
+            };
+            c.media_engine.send(MediaCommand::PlayMedia {
+                path: audios[next].path.clone(),
+                kind: MediaKind::Audio,
+                loop_playback: false,
+            });
+        };
+        if dir < 0 {
+            ui.on_player_prev(step);
+        } else {
+            ui.on_player_next(step);
+        }
+    }
+
+    onboarding::wire(
+        &ui,
+        ctx.borrow().storage.clone(),
+        rt.clone(),
+        onboarding_dir,
+        onboarding_done,
+        is_headless_test,
+    );
 
     ui.run()?;
 
@@ -2260,13 +2333,16 @@ fn wire_callbacks(ui: &MainWindow, ctx: Rc<RefCell<AppContext>>) {
             }
 
             let fullscreen = !windowed;
+            // Com um monitor só, a saída em tela cheia não pode ficar sempre no topo:
+            // senão cobre o painel do operador e ele não consegue voltar.
+            let multi_monitor = enumerate_monitors().len() > 1;
             if let Some(mgr) = &c.output_mgr {
                 apply_single_role_monitor(
                     mgr,
                     OutputRole::Main,
                     w.get_main_monitor_index(),
                     fullscreen,
-                    fullscreen,
+                    fullscreen && multi_monitor,
                 );
                 apply_single_role_monitor(
                     mgr,
@@ -2445,7 +2521,7 @@ fn stage_and_optionally_project_song(
     c.record_song_in_session_history(&song);
     refresh_session_history_ui(ui, c);
 
-    ui.set_active_slides(ModelRc::new(VecModel::from(slides_to_cards(&song.slides))));
+    set_slides_and_reset_marks(ui, slides_to_cards(&song.slides));
 
     if project_immediately {
         let theme = c.theme_for_song(song.id);
@@ -2693,10 +2769,15 @@ fn refresh_playlist_ui(ui: &MainWindow, c: &AppContext) {
 }
 
 fn refresh_songs_ui(ui: &MainWindow, c: &AppContext, query: &str, include_archived: bool) {
-    if let Ok(songs) = c
-        .rt
-        .block_on(c.storage.search_songs(query, include_archived, None, 500))
-    {
+    if let Ok(songs) = c.rt.block_on(c.storage.search_songs_scoped(
+        query,
+        include_archived,
+        None,
+        500,
+        ui.get_search_in_title(),
+        ui.get_search_in_artist(),
+        ui.get_search_in_lyrics(),
+    )) {
         let rows: Vec<UiSongRow> = songs.iter().map(song_to_ui_row).collect();
         ui.set_songs_list(ModelRc::new(VecModel::from(rows)));
     }
@@ -3121,7 +3202,7 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
                     forced_break: s.forced_break,
                 })
                 .collect();
-            ui.set_active_slides(ModelRc::new(VecModel::from(cards)));
+            set_slides_and_reset_marks(ui, cards);
             ui.set_current_slide_index(st.current_slide_index as i32);
         }
     } else if c.staged_song.is_none() {
@@ -3131,8 +3212,29 @@ fn sync_output_state_to_ui(ui: &MainWindow, c: &mut AppContext) {
     update_live_preview_and_telemetry(ui, c);
 }
 
+/// Troca os slides ativos e zera as marcas (um bool por slide).
+fn set_slides_and_reset_marks(ui: &MainWindow, cards: Vec<UiSlideCard>) {
+    let n = cards.len();
+    ui.set_slide_marks(ModelRc::new(VecModel::from(vec![false; n])));
+    ui.set_active_slides(ModelRc::new(VecModel::from(cards)));
+}
+
 fn update_live_preview_and_telemetry(ui: &MainWindow, c: &mut AppContext) {
     let st = c.engine.snapshot();
+    {
+        let ms = c.media_engine.subscribe_status().borrow().clone();
+        let active = !ms.path.is_empty();
+        ui.set_player_active(active);
+        ui.set_player_paused(ms.paused);
+        ui.set_player_pos(ms.position_secs as f32);
+        ui.set_player_dur(ms.duration_secs as f32);
+        ui.set_player_volume(ms.volume as f32);
+        let title = std::path::Path::new(&ms.path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        ui.set_player_title(title.into());
+    }
     let vf = c.media_engine.subscribe_frames().borrow().clone();
     let cur_pts = vf.as_ref().map(|v| v.pts_ms).unwrap_or(0);
     let role_tab = ui.get_preview_role_tab();
