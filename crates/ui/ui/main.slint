@@ -1454,22 +1454,17 @@ export component MainWindow inherits Window {
                             slides-vbox := VerticalLayout {
                                 alignment: start;
                                 width: parent.width;
-                                spacing: root.slides-grid-mode ? 6px : 0px;
-                                padding: root.slides-grid-mode ? 8px : 0px;
+                                spacing: root.slides-grid-mode ? 6px : 2px;
+                                padding: root.slides-grid-mode ? 8px : 6px;
 
                                 for sc in root.active-slides : Rectangle {
                                     min-height: max(28px, sl-row-layout.preferred-height);
-                                    border-radius: root.slides-grid-mode ? 5px : 0px;
-                                    border-width: root.slides-grid-mode ? 1px : 0px;
-                                    border-color: sc.slide-idx == root.current-slide-index ? ShadTheme.live-blue-bright : ShadTheme.border;
+                                    border-radius: ShadTheme.radius-sm;
+                                    border-width: root.slides-grid-mode && sc.slide-idx == root.current-slide-index ? 1px : 0px;
+                                    border-color: ShadTheme.live-blue-bright;
                                     background: sc.slide-idx == root.current-slide-index ? ShadTheme.live-row-bg :
                                                 (slta.has-hover ? ShadTheme.muted-hover : (root.slides-grid-mode ? ShadTheme.card : transparent));
-                                    animate background { duration: 80ms; }
-
-                                    if sc.slide-idx == root.current-slide-index && !root.slides-grid-mode : Rectangle {
-                                        x: 0px; y: 0px; width: 3px; height: 100%;
-                                        background: ShadTheme.live-blue-bright;
-                                    }
+                                    animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
 
                                     sl-row-layout := HorizontalLayout {
                                         width: 100%;

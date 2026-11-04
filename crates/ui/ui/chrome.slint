@@ -51,9 +51,7 @@ export component LibTab inherits Rectangle {
 
     border-radius: 4px;
     background: root.active ? ShadTheme.selected-tab-bg : (ta.has-hover ? ShadTheme.accent : transparent);
-    border-width: root.active ? 1px : 0px;
-    border-color: ShadTheme.live-blue-bright;
-    animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
+        animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
 
     HorizontalLayout {
         alignment: center;

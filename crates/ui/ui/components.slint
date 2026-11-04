@@ -56,7 +56,7 @@ export component ShadButton inherits Rectangle {
                 root.variant == "default" ? (ta.pressed ? ShadTheme.primary-pressed : ta.has-hover ? ShadTheme.primary-hover : ShadTheme.primary) :
                 root.variant == "sky" ? (ta.pressed ? ShadTheme.sky-pressed : ta.has-hover ? ShadTheme.live-blue-hover : ShadTheme.live-blue) :
                 root.variant == "destructive" ? (ta.has-hover ? ShadTheme.destructive-hover : ShadTheme.destructive-bg) :
-                root.variant == "outline" ? (ta.has-hover ? ShadTheme.accent : ShadTheme.bg-bar) :
+                root.variant == "outline" ? (ta.has-hover ? ShadTheme.accent : transparent) :
                 root.variant == "ghost" ? (ta.has-hover ? ShadTheme.accent : transparent) :
                 (ta.pressed ? ShadTheme.accent-pressed : ta.has-hover ? ShadTheme.accent-hover : ShadTheme.accent);
 
@@ -459,8 +459,8 @@ export component ShadTabStrip inherits Rectangle {
         for tab-label[idx] in root.tabs : Rectangle {
             horizontal-stretch: 1;
             border-radius: 4px;
-            background: root.active-index == idx ? ShadTheme.accent-hover : (tta.has-hover ? ShadTheme.muted-hover : transparent);
-            drop-shadow-blur: root.active-index == idx ? 2px : 0px;
+            background: root.active-index == idx ? ShadTheme.selected-tab-bg : (tta.has-hover ? ShadTheme.muted-hover : transparent);
+            drop-shadow-blur: root.active-index == idx ? 1px : 0px;
             drop-shadow-offset-y: 1px;
             drop-shadow-color: #00000055;
             animate background { duration: 100ms; }
@@ -583,10 +583,16 @@ export component ShadSelect inherits Rectangle {
 export component ShadColSplitter inherits Rectangle {
     callback dragged(length);
 
-    width: 4px;
-    background: ta.pressed ? ShadTheme.live-blue :
-                ta.has-hover ? ShadTheme.border-strong : ShadTheme.border-subtle;
-    animate background { duration: 100ms; }
+    width: 5px;
+    background: transparent;
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        width: ta.pressed || ta.has-hover ? 2px : 1px;
+        background: ta.pressed ? ShadTheme.live-blue :
+                    ta.has-hover ? ShadTheme.border-strong : ShadTheme.border;
+        animate background, width { duration: ShadTheme.motion-fast; easing: ease-out; }
+    }
 
     ta := TouchArea {
         mouse-cursor: col-resize;
