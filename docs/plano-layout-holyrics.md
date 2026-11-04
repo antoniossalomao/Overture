@@ -1,6 +1,21 @@
 # Plano: deixar a tela principal do Overture igual à do Holyrics
 
-Status: planejamento. Nada implementado nesta etapa.
+Status: fases 1 a 5 implementadas (PR `claude/kind-gates-5voyhj`); fases 6 a 8 pendentes.
+
+| Fase | Estado | Observações |
+|---|---|---|
+| 1 Proporções | feita | Larguras proporcionais à janela (17/35/29/13/5 %); divisor arrastado grava valor fixo. Faixa de temas recolhe abaixo de 1366 px. |
+| 2 Barra de ações | feita | Ícone de mensagens no grupo da direita; título centralizado. A seta do seletor Temporário/Culto continua o "▾" em texto. |
+| 3 Lista de slides | feita | Toolbar só com ícones e dicas; Repetir virou menu; número + check no slide ativo; marcar slide (não persiste). **Tom/BPM**: a linha existe, mas o banco não tem esses campos. |
+| 4 Player + prévia | parcial | Painel Player (faixa, tempo, busca, transporte, volume) ligado ao `MediaEngine` (`MediaStatus`, `Seek`). Não testado com libmpv real. "Salvar Tema para Música" segue no rodapé antigo. |
+| 5 Biblioteca | feita | Abas compactas, busca com escopo (título/artista/letra), título + artista na linha, rodapé com ações. **Favorito (estrela)** não feito: não há favorito de música no backend. |
+
+Correção ao plano: os filtros de busca **não** existiam no backend; foi criado `Storage::search_songs_scoped`
+(sem letra, filtra em memória por título/artista). Com ~163 mil músicas a busca por letra varre a tabela
+inteira; se ficar lenta, usar FTS5.
+
+Prints de cada fase em `docs/prints/`. Para gerar: `SNAP_DEMO=1 cargo run -p overture-ui --example snap -- 1920 1080 saida.ppm`
+(`SNAP_ONBOARDING=0..3` mostra a tela de primeira execução).
 
 ## 1. Objetivo e escopo
 

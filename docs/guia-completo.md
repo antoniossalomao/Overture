@@ -96,6 +96,27 @@ Temas salvos antes desta versão continuam válidos: os campos novos recebem o v
   - Pelo GitHub: *Actions → Fundos de letra em vídeo → Run workflow* (artefato `motion-videos`).
   - Localmente: `cargo run --release -p overture-media --example export_motion -- <pasta_saida> [filtro]` (precisa de `ffmpeg` com libx264 no PATH).
 
+## 4d. Primeira Execução e Pacote de Letras
+
+- Na primeira abertura (`onboarding_done = false` em `AppSettings`) o app mostra uma tela de boas-vindas
+  (`crates/ui/ui/onboarding.slint`, lógica em `crates/app/src/onboarding.rs`). "Baixar letras agora" baixa
+  `overture-letras.zip` da release `letras-latest` deste repositório e importa em lotes de 2 mil músicas
+  (`overture_import::read_letras_pack`). "Pular" ou "Continuar em segundo plano" também marcam a etapa como feita.
+- O pacote é gerado por `.github/workflows/letras-pack.yml` (manual e todo dia 1º): baixa o corpus
+  [damarals/letras](https://github.com/damarals/letras) (MIT), roda
+  `cargo run --release -p overture-import --example build_letras_pack -- letras-txt.zip overture-letras.zip`
+  (remove duplicatas, agrupa por inicial do artista, grava `manifest.json`) e publica na release.
+  Última medição: 174.439 arquivos → 163.329 músicas, ~87 MB.
+- **A release `letras-latest` só existe depois de rodar o workflow** (Actions › Pacote de letras › Run workflow).
+  Sem ela o download falha e a tela oferece "Tentar de novo" ou "Pular".
+- Direitos: a coletânea é MIT, mas as letras pertencem aos autores.
+- O MSI não baixa nada; o download é feito pelo app.
+
+## 4e. Painel Player
+
+Topo da coluna da prévia: faixa atual, tempo, busca por clique na barra, anterior/play-pausa/próximo/parar e volume.
+Anterior/próximo percorrem os áudios da biblioteca. O `MediaEngine` publica `MediaStatus` ~4×/s e aceita `MediaCommand::Seek`.
+
 ## 5. Instalador MSI, Atualização In-Place e Desinstalação
 
 ### Geração Reprodutível

@@ -12,6 +12,7 @@ Aplicativo desktop nativo **100% Rust puro** (zero JavaScript / WebView2) para *
   - **Modais de Estúdio & Diálogos Nativos (`rfd`):** Contagem Regressiva com prévia 16:9 ao vivo, Editor de Música, Estúdio de Temas, Multi-Monitor, Placar/Alerta de Palco, Escalas/Relatórios e seletores nativos de arquivos do Windows 11.
 
 - **Biblioteca de Músicas & Importação Inteligente (`crates/import`, `crates/storage`)**
+  - Na primeira execução, o app baixa e importa uma coletânea de letras gospel (ver `docs/guia-completo.md`, seção 4d).
   - Importação em lote de arquivos `.txt` (`UTF-8` e `ISO-8859-1` / `Windows-1252`), OpenSong XML, OpenLP (OpenLyrics) XML, PowerPoint nativo (`.pptx`) e pacote JSON próprio.
   - Extração automática de `Artista - Título.txt` (ou fallback para a primeira linha), remoção de cabeçalhos de sites de cifra/letra, máximo de 2 linhas por slide sem misturar estrofes, respeito à pontuação e proteção gramatical contra separação de artigos/preposições (`de`, `da`, `do`, `no`, `na`, `pra`, `pro`, `com`, `em`, `por` etc.), além de marcador `quebra_forcada` para revisão.
   - Remoção de duplicatas exatas, sinalização de homônimos (`título + artista`), arquivamento reversível e busca indexada em **menos de 100 ms** mesmo em bibliotecas com mais de 500 músicas.
