@@ -7,31 +7,31 @@ export component ShadBadge inherits Rectangle {
     in property <string> variant: "secondary"; // "default" | "secondary" | "outline" | "sky" | "amber" | "emerald"
 
     height: 18px;
-    border-radius: 4px;
+    border-radius: 9px;
     border-width: 1px;
     background: root.variant == "default" ? ShadTheme.primary :
-                root.variant == "sky" ? #0f1320 :
+                root.variant == "sky" ? #0a84ff26 :
                 root.variant == "amber" ? ShadTheme.amber-bg :
                 root.variant == "emerald" ? ShadTheme.emerald-bg :
                 root.variant == "outline" ? transparent : ShadTheme.muted;
     border-color: root.variant == "default" ? ShadTheme.primary :
-                  root.variant == "sky" ? #8fa0d0 :
+                  root.variant == "sky" ? #0a84ff59 :
                   root.variant == "amber" ? ShadTheme.amber-border :
                   root.variant == "emerald" ? ShadTheme.emerald-border : ShadTheme.border;
 
     HorizontalLayout {
-        padding-left: 6px;
-        padding-right: 6px;
+        padding-left: 8px;
+        padding-right: 8px;
         alignment: center;
         Text {
             text: root.text;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             vertical-alignment: center;
             color: root.variant == "default" ? ShadTheme.primary-fg :
-                   root.variant == "sky" ? #b9c6ea :
-                   root.variant == "amber" ? #e9b467 :
-                   root.variant == "emerald" ? #74cfae : ShadTheme.fg-muted;
+                   root.variant == "sky" ? ShadTheme.live-blue-bright :
+                   root.variant == "amber" ? ShadTheme.amber :
+                   root.variant == "emerald" ? ShadTheme.emerald : ShadTheme.fg-muted;
         }
     }
 }
@@ -47,21 +47,20 @@ export component ShadButton inherits Rectangle {
 
     height: root.size == "xs" ? 24px : root.size == "md" ? 34px : 28px;
     border-radius: ShadTheme.radius-sm;
-    border-width: (root.variant == "outline" || root.variant == "secondary" || root.variant == "destructive" || root.active) ? 1px : 0px;
-    border-color: root.active ? ShadTheme.live-blue-bright :
-                  root.variant == "destructive" ? ShadTheme.destructive-border :
+    border-width: (root.variant == "outline" || root.variant == "destructive") ? 1px : 0px;
+    border-color: root.variant == "destructive" ? ShadTheme.destructive-border :
                   root.variant == "outline" ? ShadTheme.border-strong : ShadTheme.border;
 
-    background: root.disabled ? #1b1c1f80 :
+    background: root.disabled ? ShadTheme.muted :
                 root.active ? ShadTheme.live-blue :
-                root.variant == "default" ? (ta.pressed ? #d6d8de : ta.has-hover ? ShadTheme.primary-hover : ShadTheme.primary) :
-                root.variant == "sky" ? (ta.pressed ? #8fa0d0 : ta.has-hover ? ShadTheme.live-blue-hover : ShadTheme.live-blue) :
+                root.variant == "default" ? (ta.pressed ? ShadTheme.primary-pressed : ta.has-hover ? ShadTheme.primary-hover : ShadTheme.primary) :
+                root.variant == "sky" ? (ta.pressed ? ShadTheme.sky-pressed : ta.has-hover ? ShadTheme.live-blue-hover : ShadTheme.live-blue) :
                 root.variant == "destructive" ? (ta.has-hover ? ShadTheme.destructive-hover : ShadTheme.destructive-bg) :
-                root.variant == "outline" ? (ta.has-hover ? ShadTheme.accent : ShadTheme.bg-bar) :
+                root.variant == "outline" ? (ta.has-hover ? ShadTheme.accent : transparent) :
                 root.variant == "ghost" ? (ta.has-hover ? ShadTheme.accent : transparent) :
-                (ta.pressed ? #34363c : ta.has-hover ? ShadTheme.accent-hover : ShadTheme.accent);
+                (ta.pressed ? ShadTheme.accent-pressed : ta.has-hover ? ShadTheme.accent-hover : ShadTheme.accent);
 
-    animate background { duration: 110ms; }
+    animate background { duration: ShadTheme.motion-fast; easing: ease-out; }
 
     HorizontalLayout {
         padding-left: root.size == "xs" ? 7px : 10px;
@@ -74,8 +73,8 @@ export component ShadButton inherits Rectangle {
             LucideIcon {
                 name: root.icon;
                 icon-size: root.size == "xs" ? 12px : 13px;
-                tint: root.variant == "default" && !root.active ? ShadTheme.primary-fg :
-                      root.variant == "destructive" ? #f5c2c8 : ShadTheme.fg;
+                tint: (root.variant == "default" || root.variant == "sky" || root.active) ? ShadTheme.on-accent :
+                      root.variant == "destructive" ? ShadTheme.destructive : ShadTheme.fg;
             }
         }
         if root.label != "" : Text {
@@ -84,8 +83,8 @@ export component ShadButton inherits Rectangle {
             font-weight: 500;
             vertical-alignment: center;
             color: root.disabled ? ShadTheme.fg-subtle :
-                   root.variant == "default" && !root.active ? ShadTheme.primary-fg :
-                   root.variant == "destructive" ? #f5c2c8 : ShadTheme.fg;
+                   (root.variant == "default" || root.variant == "sky" || root.active) ? ShadTheme.on-accent :
+                   root.variant == "destructive" ? ShadTheme.destructive : ShadTheme.fg;
         }
     }
 
@@ -121,8 +120,8 @@ export component ShadIconButton inherits Rectangle {
         y: (parent.height - self.height) / 2;
         name: root.icon;
         icon-size: root.icon-px;
-        tint: root.active ? #ffffff :
-              root.danger && ta.has-hover ? #f07c88 :
+        tint: root.active ? ShadTheme.on-accent :
+              root.danger && ta.has-hover ? ShadTheme.destructive :
               ta.has-hover ? ShadTheme.fg :
               root.subtle ? ShadTheme.fg-subtle : ShadTheme.fg-muted;
     }
@@ -244,7 +243,7 @@ export component ShadInput inherits Rectangle {
                 vertical-alignment: center;
                 single-line: true;
                 selection-background-color: ShadTheme.live-blue;
-                selection-foreground-color: #ffffff;
+                selection-foreground-color: ShadTheme.on-accent;
                 edited => { root.edited(self.text); }
                 accepted => { root.accepted(self.text); }
             }
@@ -328,7 +327,7 @@ export component ShadTextarea inherits Rectangle {
             single-line: false;
             wrap: word-wrap;
             selection-background-color: ShadTheme.live-blue;
-            selection-foreground-color: #ffffff;
+            selection-foreground-color: ShadTheme.on-accent;
             edited => { root.edited(self.text); }
         }
     }
@@ -345,21 +344,22 @@ export component ShadSwitch inherits HorizontalLayout {
     VerticalLayout {
         alignment: center;
         Rectangle {
-            width: 32px;
-            height: 18px;
-            border-radius: 9px;
-            border-width: 1px;
-            border-color: root.checked ? ShadTheme.emerald : ShadTheme.border-strong;
+            width: 36px;
+            height: 20px;
+            border-radius: 10px;
             background: root.checked ? ShadTheme.emerald : ShadTheme.accent;
             animate background { duration: 140ms; }
 
             Rectangle {
-                x: root.checked ? 16px : 2px;
+                x: root.checked ? 18px : 2px;
                 y: 2px;
-                width: 12px;
-                height: 12px;
-                border-radius: 6px;
-                background: root.checked ? #17271f : ShadTheme.fg;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                background: ShadTheme.on-accent;
+                drop-shadow-blur: 3px;
+                drop-shadow-offset-y: 1px;
+                drop-shadow-color: #00000066;
                 animate x { duration: 140ms; easing: ease-out; }
             }
 
@@ -449,11 +449,9 @@ export component ShadTabStrip inherits Rectangle {
     in-out property <int> active-index: 0;
     callback changed(int);
 
-    height: 28px;
-    background: ShadTheme.muted;
+    height: 26px;
+    background: ShadTheme.bg-bar;
     border-radius: ShadTheme.radius-sm;
-    border-width: 1px;
-    border-color: ShadTheme.border-subtle;
 
     HorizontalLayout {
         padding: 2px;
@@ -461,9 +459,10 @@ export component ShadTabStrip inherits Rectangle {
         for tab-label[idx] in root.tabs : Rectangle {
             horizontal-stretch: 1;
             border-radius: 4px;
-            border-width: root.active-index == idx ? 1px : 0px;
-            border-color: ShadTheme.border;
-            background: root.active-index == idx ? ShadTheme.bg : (tta.has-hover ? ShadTheme.muted-hover : transparent);
+            background: root.active-index == idx ? ShadTheme.selected-tab-bg : (tta.has-hover ? ShadTheme.muted-hover : transparent);
+            drop-shadow-blur: root.active-index == idx ? 1px : 0px;
+            drop-shadow-offset-y: 1px;
+            drop-shadow-color: #00000055;
             animate background { duration: 100ms; }
 
             Text {
@@ -541,7 +540,7 @@ export component ShadSelect inherits Rectangle {
             border-width: 1px;
             border-color: ShadTheme.border-strong;
             drop-shadow-blur: 16px;
-            drop-shadow-color: #000000aa;
+            drop-shadow-color: ShadTheme.shadow-popover;
 
             pop-vbox := VerticalLayout {
                 padding: 4px;
@@ -584,10 +583,16 @@ export component ShadSelect inherits Rectangle {
 export component ShadColSplitter inherits Rectangle {
     callback dragged(length);
 
-    width: 4px;
-    background: ta.pressed ? ShadTheme.live-blue :
-                ta.has-hover ? ShadTheme.border-strong : ShadTheme.border-subtle;
-    animate background { duration: 100ms; }
+    width: 5px;
+    background: transparent;
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        width: ta.pressed || ta.has-hover ? 2px : 1px;
+        background: ta.pressed ? ShadTheme.live-blue :
+                    ta.has-hover ? ShadTheme.border-strong : ShadTheme.border;
+        animate background, width { duration: ShadTheme.motion-fast; easing: ease-out; }
+    }
 
     ta := TouchArea {
         mouse-cursor: col-resize;
@@ -626,6 +631,6 @@ export component ShadScrollArea inherits Rectangle {
         width: 4px;
         height: max(24px, (parent.height - 4px) * (root.height / max(1px, root.content-height)));
         border-radius: 2px;
-        background: #3f3f46aa;
+        background: #ffffff33;
     }
 }
